@@ -48,6 +48,20 @@ pnpm tauri build
 - **安装包**：运行 `.msi` 文件，按向导完成安装
 - **便携版**：直接运行 `AIPet.exe`
 
+## 本地数据（Windows）
+
+应用数据目录（与 Tauri 标识一致）：
+
+`%APPDATA%\\com.wonderland6627.aipet\\`
+
+| 文件 / 目录 | 说明 |
+|-------------|------|
+| `config.json` | 全局设置：置顶、自启、动画速度/尺寸、当前宠物文件夹名 |
+| `state-config.json` | 前台进程 → 动画状态 映射 |
+| `pets\\<宠物文件夹>\\` | 每个宠物一个子文件夹，需包含 **pet.json**（Petdex 原格式）与雪碧图；首次扫描会自动生成 **pet-atlas.json**（帧布局，勿改 legacy 的 pet.json） |
+
+可将仓库内 `templates/petdex/<名称>/` 复制到上述 `pets\\` 下，并放入对应 `spritesheet.webp`。
+
 ## 许可证
 
 私有项目，暂不公开。

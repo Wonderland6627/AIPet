@@ -1,7 +1,7 @@
 {
   "productName": "AIPet",
-  "version": "0.1.0",
-  "identifier": "com.wonderland.aipet",
+  "version": "0.2.0",
+  "identifier": "com.wonderland6627.aipet",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:1420",
@@ -35,7 +35,11 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": null,
+      "assetProtocol": {
+        "enable": true,
+        "scope": ["$APPDATA/**", "$RESOURCE/**"]
+      }
     }
   },
   "bundle": {

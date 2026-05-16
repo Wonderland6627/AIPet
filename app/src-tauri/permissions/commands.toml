@@ -1,0 +1,16 @@
+[[permission]]
+identifier = "allow-aipet-commands"
+description = "Allow AIPet custom IPC commands for settings and pet data."
+commands.allow = [
+  "show_pet_menu",
+  "get_app_config",
+  "save_app_config",
+  "get_state_config",
+  "save_state_config",
+  "list_pets",
+  "get_pet_detail",
+  "get_pet_spritesheet_path",
+  "refresh_pets_dir",
+  "get_app_data_path",
+  "open_app_data_dir",
+]

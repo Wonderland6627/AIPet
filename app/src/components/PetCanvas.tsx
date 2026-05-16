@@ -1,58 +1,91 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 
-const CELL_WIDTH = 192;
-const CELL_HEIGHT = 208;
-const FRAME_DURATION_MS = 120;
+const BASE_FRAME_MS = 120;
 
-export const ROWS = [
-  { state: "idle", frames: 6 },
-  { state: "running-right", frames: 8 },
-  { state: "running-left", frames: 8 },
-  { state: "waving", frames: 4 },
-  { state: "jumping", frames: 5 },
-  { state: "failed", frames: 8 },
-  { state: "waiting", frames: 6 },
-  { state: "running", frames: 6 },
-  { state: "review", frames: 6 },
-] as const;
-
-interface Props {
-  currentRow: number;
-  isLooping?: boolean;
+export interface PetRow {
+  state: string;
+  displayName: string;
+  frames: number;
 }
 
-export default function PetCanvas({ currentRow, isLooping = true }: Props) {
+interface Props {
+  rows: readonly PetRow[];
+  currentRowIndex: number;
+  spritesheetUrl: string;
+  cellWidth: number;
+  cellHeight: number;
+  animationSpeed: number;
+  scale?: number;
+  className?: string;
+}
+
+export default function PetCanvas({
+  rows,
+  currentRowIndex,
+  spritesheetUrl,
+  cellWidth,
+  cellHeight,
+  animationSpeed,
+  scale = 1,
+  className = "",
+}: Props) {
+  const styleId = useMemo(
+    () =>
+      `sk-${cellWidth}x${cellHeight}-${rows.map((r) => `${r.state}-${r.frames}`).join("_")}`,
+    [rows, cellWidth, cellHeight],
+  );
+
   useEffect(() => {
-    if (document.getElementById("sprite-keyframes")) return;
+    const fullId = styleId;
+    if (document.getElementById(fullId)) return;
 
     const style = document.createElement("style");
-    style.id = "sprite-keyframes";
-    style.textContent = ROWS.map(
-      (row, i) =>
-        `@keyframes sprite-row-${i}{from{background-position-x:0}to{background-position-x:-${row.frames * CELL_WIDTH}px}}`,
-    ).join("\n");
+    style.id = fullId;
+    style.textContent = rows
+      .map(
+        (row, i) =>
+          `@keyframes sprite-row-${fullId}-${i}{from{background-position-x:0}to{background-position-x:-${row.frames * cellWidth}px}}`,
+      )
+      .join("\n");
     document.head.appendChild(style);
-
     return () => {
       style.remove();
     };
-  }, []);
+  }, [rows, cellWidth, styleId]);
 
-  const idx = currentRow >= 0 && currentRow < ROWS.length ? currentRow : 0;
-  const row = ROWS[idx];
-  const duration = row.frames * FRAME_DURATION_MS;
+  const idx =
+    currentRowIndex >= 0 && currentRowIndex < rows.length ? currentRowIndex : 0;
+  const row = rows[idx] ?? rows[0];
+  if (!row) {
+    return null;
+  }
+
+  const frameMs = BASE_FRAME_MS / Math.max(0.1, animationSpeed);
+  const duration = row.frames * frameMs;
+  const w = Math.round(cellWidth * scale);
+  const h = Math.round(cellHeight * scale);
+
+  const animName = `sprite-row-${styleId}-${idx}`;
+  const anim = `${animName} ${duration}ms steps(${row.frames}) infinite`;
 
   return (
     <div
-      key={idx}
-      style={{
-        width: CELL_WIDTH,
-        height: CELL_HEIGHT,
-        backgroundImage: "url(/spritesheet.webp)",
-        backgroundRepeat: "no-repeat",
-        backgroundPositionY: -(idx * CELL_HEIGHT),
-        animation: `sprite-row-${idx} ${duration}ms steps(${row.frames}) ${isLooping ? "infinite" : "forwards"}`,
-      }}
-    />
+      className={className}
+      style={{ width: w, height: h, overflow: "hidden" }}
+    >
+      <div
+        key={`${idx}-${spritesheetUrl}`}
+        style={{
+          width: cellWidth,
+          height: cellHeight,
+          transform: `scale(${scale})`,
+          transformOrigin: "top left",
+          backgroundImage: `url("${spritesheetUrl}")`,
+          backgroundRepeat: "no-repeat",
+          backgroundPositionY: -(idx * cellHeight),
+          animation: anim,
+        }}
+      />
+    </div>
   );
 }
