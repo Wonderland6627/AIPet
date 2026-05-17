@@ -27,26 +27,12 @@ export const DEFAULT_FALLBACK_ROWS = [
   { state: "review", displayName: "审视", frames: 6 },
 ] as const;
 
-export const PRESET_PROCESSES = [
-  { label: "Cursor", value: "cursor.exe" },
-  { label: "VS Code", value: "code.exe" },
-  { label: "Rider", value: "rider.exe" },
-  { label: "Unity", value: "unity.exe" },
-  { label: "Visual Studio", value: "devenv.exe" },
-  { label: "Photoshop", value: "photoshop.exe" },
-  { label: "Photoshop (ps)", value: "ps.exe" },
-  { label: "After Effects", value: "afterfx.exe" },
-  { label: "Excel", value: "excel.exe" },
-  { label: "WPS", value: "wps.exe" },
-  { label: "Blender", value: "blender.exe" },
-  { label: "Figma", value: "figma.exe" },
-];
 
 export const TRIGGER_TYPE_LABELS: Record<string, string> = {
-  processFocus: "当前聚焦进程",
-  highResource: "CPU/内存占用过高",
-  audioPlaying: "正在播放音频",
-  microphoneActive: "麦克风被占用",
-  continuousFocus: "持续专注",
-  computerIdle: "电脑挂机",
+  processFocus: "当聚焦到进程",
+  highResource: "当硬件占用过高",
+  audioPlaying: "当播放音频",
+  microphoneActive: "当麦克风被占用",
+  continuousFocus: "当持续专注",
+  computerIdle: "当电脑挂机",
 };

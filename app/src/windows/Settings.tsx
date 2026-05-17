@@ -2,6 +2,7 @@ import { NavLink, Route, Routes, Navigate } from "react-router-dom";
 import { PetLibrarySection } from "./PetLibrarySection";
 import { StateConfigSection } from "./StateConfigSection";
 import { AppSettingsSection } from "./AppSettingsSection";
+import { PetStatusPanel } from "./PetStatusPanel";
 
 const NAV_ITEMS = [
   { to: "/pets", label: "宠物库" },
@@ -12,7 +13,7 @@ const NAV_ITEMS = [
 export default function Settings() {
   return (
     <div className="flex h-screen bg-white text-gray-900">
-      <nav className="flex w-44 flex-col gap-1 border-r border-gray-200 bg-gray-50 p-4">
+      <nav className="flex h-full w-44 shrink-0 flex-col gap-1 border-r border-gray-200 bg-gray-50 p-4">
         <h1 className="mb-4 px-3 text-lg font-bold">AIPet</h1>
         {NAV_ITEMS.map((item) => (
           <NavLink
@@ -29,6 +30,7 @@ export default function Settings() {
             {item.label}
           </NavLink>
         ))}
+        <PetStatusPanel />
       </nav>
       <main className="flex-1 overflow-y-auto p-6">
         <Routes>

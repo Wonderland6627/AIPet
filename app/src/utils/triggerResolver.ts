@@ -63,6 +63,111 @@ export function resolveAnimationRowIndex(
   return 0;
 }
 
+const HIGH_RESOURCES = ["cpu", "memory"] as const;
+export type HighResourceKind = (typeof HIGH_RESOURCES)[number];
+
+/** 已被其它状态占用的硬件资源（cpu / memory）。 */
+export function getUsedResources(
+  mappings: StateMapping[],
+  excludeState: string,
+): Set<HighResourceKind> {
+  const used = new Set<HighResourceKind>();
+  for (const m of mappings) {
+    if (m.state === excludeState) continue;
+    if (m.trigger.type !== "highResource") continue;
+    used.add(m.trigger.resource);
+  }
+  return used;
+}
+
+/** 选择第一个未被占用的资源；若均已占用则返回 null。 */
+export function pickAvailableResource(
+  mappings: StateMapping[],
+  excludeState: string,
+): HighResourceKind | null {
+  const used = getUsedResources(mappings, excludeState);
+  for (const r of HIGH_RESOURCES) {
+    if (!used.has(r)) return r;
+  }
+  return null;
+}
+
+export interface ResolvedPetStatus {
+  state: string;
+  displayName: string;
+  reason: string;
+  isIdle: boolean;
+}
+
+function findMatchingMapping(
+  system: SystemState,
+  stateConfig: StateConfig,
+): StateMapping | null {
+  for (const triggerType of PRIORITY) {
+    for (const mapping of stateConfig.mappings) {
+      if (mapping.trigger.type !== triggerType) continue;
+      if (!mappingMatches(mapping, system)) continue;
+      return mapping;
+    }
+  }
+  return null;
+}
+
+export function resolvePetStatus(
+  system: SystemState,
+  stateConfig: StateConfig,
+  atlasRows: PetAtlasRow[],
+): ResolvedPetStatus {
+  const mapping = findMatchingMapping(system, stateConfig);
+  if (!mapping) {
+    const idleRow = atlasRows.find((r) => r.state === "idle");
+    return {
+      state: "idle",
+      displayName: idleRow?.displayName ?? "待机",
+      reason: "无匹配触发条件",
+      isIdle: true,
+    };
+  }
+
+  const row = atlasRows.find((r) => r.state === mapping.state);
+  const displayName = row?.displayName ?? mapping.state;
+  const reason = describeTriggerReason(mapping, system);
+
+  return {
+    state: mapping.state,
+    displayName,
+    reason,
+    isIdle: mapping.state === "idle",
+  };
+}
+
+function describeTriggerReason(
+  mapping: StateMapping,
+  system: SystemState,
+): string {
+  const t = mapping.trigger;
+  switch (t.type) {
+    case "processFocus":
+      return `进程聚焦: ${system.activeProcess || "未知"}`;
+    case "highResource": {
+      const val =
+        t.resource === "cpu" ? system.cpuPercent : system.memoryPercent;
+      const label = t.resource === "cpu" ? "CPU" : "内存";
+      return `${label} 占用 ${Math.round(val)}%（阈值 ${t.threshold}%）`;
+    }
+    case "audioPlaying":
+      return "正在播放音频";
+    case "microphoneActive":
+      return "麦克风被占用";
+    case "continuousFocus":
+      return `持续专注 ${Math.floor(system.focusSeconds / 60)} 分钟（需 ${t.minutes} 分钟）`;
+    case "computerIdle":
+      return `电脑挂机 ${Math.floor(system.idleSeconds / 60)} 分钟（需 ${t.minutes} 分钟）`;
+    default:
+      return "系统触发";
+  }
+}
+
 export function normalizeExe(raw: string): string {
   const v = raw.trim().toLowerCase();
   if (!v) return "";

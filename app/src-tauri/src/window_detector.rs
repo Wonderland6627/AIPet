@@ -64,6 +64,49 @@ fn endpoint_peak_active(data_flow: windows::Win32::Media::Audio::EDataFlow) -> b
 }
 
 #[cfg(windows)]
+pub fn get_visible_window_pids() -> std::collections::HashSet<u32> {
+    use windows::Win32::UI::WindowsAndMessaging::{
+        EnumWindows, GetWindow, IsWindowVisible, GW_OWNER,
+    };
+    use windows::Win32::Foundation::{HWND, LPARAM};
+    use windows::core::BOOL;
+    use std::collections::HashSet;
+
+    unsafe extern "system" fn enum_callback(hwnd: HWND, lparam: LPARAM) -> BOOL {
+        unsafe {
+            if !IsWindowVisible(hwnd).as_bool() {
+                return BOOL(1);
+            }
+            let owner = GetWindow(hwnd, GW_OWNER);
+            if !owner.is_err() && owner.unwrap_or(HWND::default()).0 != std::ptr::null_mut() {
+                return BOOL(1);
+            }
+            let mut pid: u32 = 0;
+            GetWindowThreadProcessId(hwnd, Some(&mut pid));
+            if pid != 0 {
+                let set = &mut *(lparam.0 as *mut HashSet<u32>);
+                set.insert(pid);
+            }
+            BOOL(1)
+        }
+    }
+
+    let mut pids = HashSet::new();
+    unsafe {
+        let _ = EnumWindows(
+            Some(enum_callback),
+            LPARAM(&mut pids as *mut HashSet<u32> as isize),
+        );
+    }
+    pids
+}
+
+#[cfg(not(windows))]
+pub fn get_visible_window_pids() -> std::collections::HashSet<u32> {
+    std::collections::HashSet::new()
+}
+
+#[cfg(windows)]
 pub fn get_active_process_name() -> Option<String> {
     unsafe {
         let hwnd = GetForegroundWindow();

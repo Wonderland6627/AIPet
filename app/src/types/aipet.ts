@@ -33,6 +33,11 @@ export interface SystemState {
   focusSeconds: number;
 }
 
+export interface RunningProcessItem {
+  exe: string;
+  displayName: string;
+}
+
 export interface PetAtlasRow {
   state: string;
   displayName: string;

@@ -297,19 +297,36 @@ fn sync_autostart_internal(app: &AppHandle, enabled: bool) {
         }
         return;
     }
+    let Ok(is_on) = autolaunch.is_enabled() else {
+        return;
+    };
+    if !is_on {
+        return;
+    }
     if let Err(e) = autolaunch.disable() {
         eprintln!("autostart disable: {e}");
     }
 }
 
-pub fn apply_runtime_from_config(app: &AppHandle, cfg: &AppConfig) {
+fn apply_window_runtime(app: &AppHandle, cfg: &AppConfig) {
     if let Some(main) = app.get_webview_window("main") {
         let _ = main.set_always_on_top(cfg.always_on_top);
         let w = (192.0_f64 * cfg.animation_scale).round() as u32;
         let h = (208.0_f64 * cfg.animation_scale).round() as u32;
         let _ = main.set_size(tauri::LogicalSize::new(w, h));
     }
+}
+
+pub fn apply_runtime_from_config(app: &AppHandle, cfg: &AppConfig) {
+    apply_window_runtime(app, cfg);
     sync_autostart_internal(app, cfg.auto_start);
+}
+
+pub fn apply_runtime_from_config_delta(app: &AppHandle, cfg: &AppConfig, prev: &AppConfig) {
+    apply_window_runtime(app, cfg);
+    if prev.auto_start != cfg.auto_start {
+        sync_autostart_internal(app, cfg.auto_start);
+    }
 }
 
 pub fn read_or_create_app_config(app: &AppHandle) -> Result<AppConfig, String> {
@@ -330,6 +347,7 @@ pub fn get_app_config(app: AppHandle) -> Result<AppConfig, String> {
 
 #[tauri::command]
 pub fn save_app_config(app: AppHandle, mut config: AppConfig) -> Result<(), String> {
+    let prev = read_or_create_app_config(&app)?;
     if config.animation_speed < 0.1 {
         config.animation_speed = 0.1;
     }
@@ -344,7 +362,7 @@ pub fn save_app_config(app: AppHandle, mut config: AppConfig) -> Result<(), Stri
     }
     let root = ensure_app_layout(&app)?;
     write_json(&root.join(CONFIG_FILE), &config)?;
-    apply_runtime_from_config(&app, &config);
+    apply_runtime_from_config_delta(&app, &config, &prev);
     let _ = app.emit("app-config-changed", &config);
     Ok(())
 }

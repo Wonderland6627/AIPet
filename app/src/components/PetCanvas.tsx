@@ -44,7 +44,7 @@ export default function PetCanvas({
     style.textContent = rows
       .map(
         (row, i) =>
-          `@keyframes sprite-row-${fullId}-${i}{from{background-position-x:0}to{background-position-x:-${row.frames * cellWidth}px}}`,
+          `@keyframes sprite-row-${fullId}-${i}{from{transform:translate3d(0,0,0)}to{transform:translate3d(-${row.frames * cellWidth}px,0,0)}}`,
       )
       .join("\n");
     document.head.appendChild(style);
@@ -64,28 +64,37 @@ export default function PetCanvas({
   const duration = row.frames * frameMs;
   const w = Math.round(cellWidth * scale);
   const h = Math.round(cellHeight * scale);
+  const stripW = row.frames * cellWidth;
 
   const animName = `sprite-row-${styleId}-${idx}`;
   const anim = `${animName} ${duration}ms steps(${row.frames}) infinite`;
 
   return (
-    <div
-      className={className}
-      style={{ width: w, height: h, overflow: "hidden" }}
-    >
+    <div className={className} style={{ width: w, height: h, overflow: "hidden" }}>
       <div
-        key={`${idx}-${spritesheetUrl}`}
         style={{
           width: cellWidth,
           height: cellHeight,
           transform: `scale(${scale})`,
           transformOrigin: "top left",
-          backgroundImage: `url("${spritesheetUrl}")`,
-          backgroundRepeat: "no-repeat",
-          backgroundPositionY: -(idx * cellHeight),
-          animation: anim,
+          overflow: "hidden",
         }}
-      />
+      >
+        <div
+          key={`${idx}-${spritesheetUrl}`}
+          style={{
+            width: stripW,
+            height: cellHeight,
+            backgroundImage: `url("${spritesheetUrl}")`,
+            backgroundRepeat: "no-repeat",
+            backgroundPositionY: -(idx * cellHeight),
+            backgroundSize: "auto",
+            imageRendering: "pixelated",
+            willChange: "transform",
+            animation: anim,
+          }}
+        />
+      </div>
     </div>
   );
 }

@@ -3,6 +3,8 @@ identifier = "allow-aipet-commands"
 description = "Allow AIPet custom IPC commands for settings and pet data."
 commands.allow = [
   "show_pet_menu",
+  "clamp_main_window_to_screen",
+  "reset_main_window_position",
   "get_app_config",
   "save_app_config",
   "get_state_config",
@@ -13,4 +15,5 @@ commands.allow = [
   "refresh_pets_dir",
   "get_app_data_path",
   "open_app_data_dir",
+  "list_running_processes",
 ]

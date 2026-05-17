@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { listen } from "@tauri-apps/api/event";
+import { emit, listen } from "@tauri-apps/api/event";
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 import PetCanvas from "./components/PetCanvas";
 import { DEFAULT_FALLBACK_ROWS } from "./constants/codex";
 import type {
@@ -32,9 +31,16 @@ export default function App() {
   const [spritesheetUrl, setSpritesheetUrl] = useState("/spritesheet.webp");
   const [processRow, setProcessRow] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
-  const clickCountRef = useRef(0);
-  const clickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [dragDirection, setDragDirection] = useState<"left" | "right" | null>(null);
+  const isDraggingRef = useRef(false);
   const lastSystemRef = useRef<SystemState | null>(null);
+
+  useEffect(() => {
+    void emit("pet-dragging-changed", {
+      dragging: isDragging,
+      direction: isDragging ? dragDirection : null,
+    });
+  }, [isDragging, dragDirection]);
 
   const loadPetAssets = useCallback(async (folderId: string) => {
     if (!folderId) {
@@ -62,12 +68,15 @@ export default function App() {
       lastSystemRef.current = system;
       if (!stateConfig) return;
       const rows = rowsFromDetail(petDetail);
-      setProcessRow(
-        resolveAnimationRowIndex(system, stateConfig, rows),
-      );
+      setProcessRow(resolveAnimationRowIndex(system, stateConfig, rows));
     },
     [stateConfig, petDetail],
   );
+
+  const applySystemStateRef = useRef(applySystemState);
+  useEffect(() => {
+    applySystemStateRef.current = applySystemState;
+  }, [applySystemState]);
 
   const bootstrap = useCallback(async () => {
     let cfg = await invoke<AppConfig>("get_app_config");
@@ -99,9 +108,9 @@ export default function App() {
   useEffect(() => {
     const unlisten = listen<StateConfig>("state-config-changed", (e) => {
       setStateConfig(e.payload);
-      if (lastSystemRef.current) {
-        applySystemState(lastSystemRef.current);
-      }
+      if (isDraggingRef.current) return;
+      if (!lastSystemRef.current) return;
+      applySystemState(lastSystemRef.current);
     });
     return () => {
       unlisten.then((fn) => fn());
@@ -110,68 +119,129 @@ export default function App() {
 
   useEffect(() => {
     const unlisten = listen<SystemState>("system-state-changed", (event) => {
-      if (isDragging) return;
+      if (isDraggingRef.current) return;
       applySystemState(event.payload);
     });
     return () => {
       unlisten.then((fn) => fn());
     };
-  }, [applySystemState, isDragging]);
+  }, [applySystemState]);
 
   useEffect(() => {
-    if (!stateConfig || !lastSystemRef.current || isDragging) return;
+    if (!stateConfig || !lastSystemRef.current || isDraggingRef.current) return;
     applySystemState(lastSystemRef.current);
-  }, [stateConfig, petDetail, applySystemState, isDragging]);
+  }, [stateConfig, petDetail, applySystemState]);
 
   const rows = useMemo(() => rowsFromDetail(petDetail), [petDetail]);
   const cellW = petDetail?.atlas.cellWidth ?? 192;
   const cellH = petDetail?.atlas.cellHeight ?? 208;
-  const dragRowIdx = rows.findIndex((r) => r.state === "running-right");
-  const dragFallback = rows.findIndex((r) => r.state === "idle");
-  const dragIdx = dragRowIdx >= 0 ? dragRowIdx : Math.max(0, dragFallback);
+  const dragIdx = (() => {
+    if (dragDirection === "left") {
+      const leftIdx = rows.findIndex((r) => r.state === "running-left");
+      if (leftIdx >= 0) return leftIdx;
+    }
+    const rightIdx = rows.findIndex((r) => r.state === "running-right");
+    if (rightIdx >= 0) return rightIdx;
+    const fallback = rows.findIndex((r) => r.state === "idle");
+    return Math.max(0, fallback);
+  })();
   const currentRow = isDragging ? dragIdx : processRow;
 
   const scale = appConfig?.animationScale ?? 1;
   const speed = appConfig?.animationSpeed ?? 1;
-
-  const openSettings = useCallback(async () => {
-    const settings = await WebviewWindow.getByLabel("settings");
-    if (settings) {
-      await settings.show();
-      await settings.setFocus();
-    }
-  }, []);
 
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     invoke("show_pet_menu");
   }, []);
 
-  const handleMouseDown = useCallback(
-    async (e: React.MouseEvent) => {
-      if (e.button !== 0) return;
+  const dragCleanupRef = useRef<(() => void) | null>(null);
 
-      clickCountRef.current += 1;
-      if (clickCountRef.current >= 2) {
-        clickCountRef.current = 0;
-        if (clickTimerRef.current) clearTimeout(clickTimerRef.current);
-        openSettings();
-        return;
-      }
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    if (e.button !== 0) return;
 
-      clickTimerRef.current = setTimeout(() => {
-        clickCountRef.current = 0;
-      }, 400);
+    // 清理上一次未结束的拖拽（防御性）
+    if (dragCleanupRef.current) {
+      dragCleanupRef.current();
+      dragCleanupRef.current = null;
+    }
 
+    let moveUnsub: (() => void) | null = null;
+    let mouseUpHandler: (() => void) | null = null;
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    let safetyTimer: ReturnType<typeof setTimeout> | null = null;
+    let cleaned = false;
+    let lastMoveX: number | null = null;
+
+    const startDragState = () => {
+      if (isDraggingRef.current) return;
       setIsDragging(true);
-      try {
-        await getCurrentWindow().startDragging();
-      } finally {
-        setIsDragging(false);
+      isDraggingRef.current = true;
+    };
+
+    const cleanup = (shouldClamp: boolean) => {
+      if (cleaned) return;
+      cleaned = true;
+      if (debounceTimer) clearTimeout(debounceTimer);
+      if (safetyTimer) clearTimeout(safetyTimer);
+      if (moveUnsub) moveUnsub();
+      if (mouseUpHandler) {
+        window.removeEventListener("mouseup", mouseUpHandler);
       }
-    },
-    [openSettings],
-  );
+      dragCleanupRef.current = null;
+
+      if (isDraggingRef.current) {
+        setIsDragging(false);
+        isDraggingRef.current = false;
+        setDragDirection(null);
+        if (shouldClamp) {
+          void invoke("clamp_main_window_to_screen");
+        }
+        if (lastSystemRef.current) {
+          applySystemStateRef.current(lastSystemRef.current);
+        }
+      }
+    };
+
+    dragCleanupRef.current = () => cleanup(true);
+
+    mouseUpHandler = () => {
+      cleanup(true);
+    };
+    window.addEventListener("mouseup", mouseUpHandler);
+
+    // 监听窗口移动事件 —— 每次移动重置去抖计时器
+    getCurrentWindow()
+      .listen("tauri://move", (moveEvent) => {
+        startDragState();
+        const { x } = moveEvent.payload as { x: number; y: number };
+        if (lastMoveX !== null && x !== lastMoveX) {
+          setDragDirection(x > lastMoveX ? "right" : "left");
+        }
+        lastMoveX = x;
+        if (debounceTimer) clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => cleanup(true), 220);
+      })
+      .then((unsub) => {
+        if (cleaned) {
+          unsub();
+          return;
+        }
+        moveUnsub = unsub;
+      });
+
+    // 安全超时：如果 500ms 内没有窗口移动事件，说明只是点击
+    safetyTimer = setTimeout(() => {
+      if (!isDraggingRef.current) {
+        cleanup(false);
+      }
+    }, 500);
+
+    // 启动 OS 拖拽
+    void getCurrentWindow()
+      .startDragging()
+      .catch(() => cleanup(false));
+  }, []);
 
   const wrapW = Math.round(cellW * scale);
   const wrapH = Math.round(cellH * scale);

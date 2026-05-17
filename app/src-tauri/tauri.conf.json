@@ -1,6 +1,6 @@
 {
   "productName": "AIPet",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "identifier": "com.wonderland6627.aipet",
   "build": {
     "frontendDist": "../dist",
@@ -15,8 +15,6 @@
         "title": "AIPet",
         "width": 192,
         "height": 208,
-        "x": 1200,
-        "y": 600,
         "transparent": true,
         "decorations": false,
         "shadow": false,
@@ -27,8 +25,10 @@
       {
         "label": "settings",
         "title": "AIPet Settings",
-        "width": 680,
-        "height": 480,
+        "width": 1000,
+        "height": 700,
+        "minWidth": 900,
+        "minHeight": 650,
         "visible": false,
         "decorations": true,
         "resizable": true

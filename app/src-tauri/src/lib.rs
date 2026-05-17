@@ -16,6 +16,15 @@ fn show_pet_menu(window: tauri::WebviewWindow) -> Result<(), String> {
     Ok(())
 }
 
+#[tauri::command]
+fn clamp_main_window_to_screen(app: tauri::AppHandle) -> Result<(), String> {
+    let Some(main_win) = app.get_webview_window("main") else {
+        return Err("main window not found".into());
+    };
+    clamp_window_to_screen(&main_win);
+    Ok(())
+}
+
 fn clamp_window_to_screen(win: &tauri::WebviewWindow) {
     let Ok(pos) = win.outer_position() else {
         return;
@@ -33,29 +42,63 @@ fn clamp_window_to_screen(win: &tauri::WebviewWindow) {
     let w = size.width as i32;
     let h = size.height as i32;
 
-    // Union bounding rect of all monitors
-    let mut union_left = i32::MAX;
-    let mut union_top = i32::MAX;
-    let mut union_right = i32::MIN;
-    let mut union_bottom = i32::MIN;
+    // 对每个显示器计算"将窗口完全限制在该显示器内"所需的目标位置，
+    // 选择距当前位置最近的那个——天然支持 T 形、L 形等不规则多屏布局。
+    let mut best_x = pos.x;
+    let mut best_y = pos.y;
+    let mut best_dist = i64::MAX;
+
     for m in &monitors {
         let mp = m.position();
         let ms = m.size();
-        union_left = union_left.min(mp.x);
-        union_top = union_top.min(mp.y);
-        union_right = union_right.max(mp.x + ms.width as i32);
-        union_bottom = union_bottom.max(mp.y + ms.height as i32);
+        let max_x = (mp.x + ms.width as i32 - w).max(mp.x);
+        let max_y = (mp.y + ms.height as i32 - h).max(mp.y);
+        let cx = pos.x.clamp(mp.x, max_x);
+        let cy = pos.y.clamp(mp.y, max_y);
+        let dx = (pos.x - cx) as i64;
+        let dy = (pos.y - cy) as i64;
+        let dist = dx * dx + dy * dy;
+        if dist < best_dist {
+            best_dist = dist;
+            best_x = cx;
+            best_y = cy;
+        }
     }
 
-    let max_x = (union_right - w).max(union_left);
-    let max_y = (union_bottom - h).max(union_top);
-    let x = pos.x.clamp(union_left, max_x);
-    let y = pos.y.clamp(union_top, max_y);
-
-    if x == pos.x && y == pos.y {
+    if best_x == pos.x && best_y == pos.y {
         return;
     }
+    let _ = win.set_position(PhysicalPosition::new(best_x, best_y));
+}
+
+fn position_main_window_bottom_right(
+    win: &tauri::WebviewWindow,
+    cfg: &config_manager::AppConfig,
+) {
+    let Ok(Some(monitor)) = win.primary_monitor() else {
+        return;
+    };
+    let mp = monitor.position();
+    let ms = monitor.size();
+    let sf = monitor.scale_factor();
+    let win_w = (192.0 * cfg.animation_scale * sf).round() as i32;
+    let win_h = (208.0 * cfg.animation_scale * sf).round() as i32;
+    let margin_right = (20.0 * sf).round() as i32;
+    let margin_bottom = (80.0 * sf).round() as i32;
+    let x = mp.x + ms.width as i32 - win_w - margin_right;
+    let y = mp.y + ms.height as i32 - win_h - margin_bottom;
     let _ = win.set_position(PhysicalPosition::new(x, y));
+}
+
+#[tauri::command]
+fn reset_main_window_position(app: tauri::AppHandle) -> Result<(), String> {
+    let cfg = config_manager::read_or_create_app_config(&app)?;
+    let Some(main_win) = app.get_webview_window("main") else {
+        return Err("main window not found".into());
+    };
+    position_main_window_bottom_right(&main_win, &cfg);
+    clamp_window_to_screen(&main_win);
+    Ok(())
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -75,14 +118,10 @@ pub fn run() {
         .setup(|app| {
             tray::create_tray(app)?;
             let cfg = config_manager::read_or_create_app_config(app.handle())?;
+
             if let Some(main_win) = app.get_webview_window("main") {
                 let _ = main_win.set_shadow(false);
-                let w = main_win.clone();
-                main_win.on_window_event(move |event| {
-                    if let tauri::WindowEvent::Moved { .. } = event {
-                        clamp_window_to_screen(&w);
-                    }
-                });
+                position_main_window_bottom_right(&main_win, &cfg);
             }
             config_manager::apply_runtime_from_config(app.handle(), &cfg);
             system_monitor::spawn_system_monitor(app.handle().clone());
@@ -101,6 +140,8 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             show_pet_menu,
+            clamp_main_window_to_screen,
+            reset_main_window_position,
             config_manager::get_app_config,
             config_manager::save_app_config,
             config_manager::get_state_config,
@@ -111,6 +152,7 @@ pub fn run() {
             config_manager::refresh_pets_dir,
             config_manager::get_app_data_path,
             config_manager::open_app_data_dir,
+            system_monitor::list_running_processes,
         ])
         .on_menu_event(|app, event| {
             if event.id.as_ref() == "hide_pet" {
