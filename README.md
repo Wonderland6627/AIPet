@@ -53,10 +53,10 @@ pnpm tauri build
 项目通过 GitHub Actions 自动构建发布：
 
 1. 更新版本号（`tauri.conf.json`、`Cargo.toml`、`package.json` 三处保持一致）
-2. 提交并推送 tag：
+2. 提交并推送与当前应用版本一致的 tag（例如当前版本是 `0.4.0` 时使用 `v0.4.0`）：
    ```bash
-   git tag v0.5.0
-   git push origin v0.5.0
+   git tag v<version>
+   git push origin v<version>
    ```
 3. CI 会自动构建并创建 GitHub Release，附带安装包和更新清单
 
