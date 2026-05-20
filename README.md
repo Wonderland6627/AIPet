@@ -41,12 +41,13 @@ cd app
 pnpm tauri build
 ```
 
-构建产物位于 `app/src-tauri/target/release/`，同时会在 `app/src-tauri/target/release/bundle/` 下生成 `.msi` 安装包和 NSIS `.exe` 安装程序。
+构建产物位于 `app/src-tauri/target/release/`，默认会尝试生成 `.msi` 和 NSIS 安装包。  
+CI 发布流程当前固定为 NSIS（`--bundles nsis`）以避免 GitHub Runner 上 WiX 打包不稳定问题。
 
 ## 安装方式
 
 - **NSIS 安装程序**（推荐）：运行 `AIPet_x.y.z_x64-setup.exe`，按向导完成安装
-- **MSI 安装包**：运行 `.msi` 文件，按向导完成安装
+- **MSI 安装包**：仅在本地 WiX 环境稳定时作为可选产物使用
 
 ## 发布新版本
 
