@@ -45,12 +45,24 @@
   },
   "bundle": {
     "active": true,
+    "createUpdaterArtifacts": true,
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "resources": {
+      "bundled-pets/**/*": "bundled-pets/"
+    }
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/Wonderland6627/AIPet/releases/latest/download/latest.json"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IHJzaWduIGVuY3J5cHRlZCBzZWNyZXQga2V5ClJXUlRZMEl5dWtsZXdRSDM2aXMxY29kL0ZPY2pGL1hiNDNkV3pCbHlVdi9RNHhBczVXNEFBQkFBQUFBQUFBQUFBQUlBQUFBQXJVeHU2ZEFkcFdNOU13WUdNRHBpaUcyWUJwaDJwMHQ3TncvV2F3VytwTDlpK3I1M3dmUitJOEVHZi95RnZ6TVFYN0NqVGJienZWd3E5VDBUQkI0dkRQcmJoTWJUVklZVkdhYjhvTHlrSkVScU1MQTFGc241eDdNWk9mR21MWUFRWGNsZ0lYQlZLQjg9Cg=="
+    }
   }
 }

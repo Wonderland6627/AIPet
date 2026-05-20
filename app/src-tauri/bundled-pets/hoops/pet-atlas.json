@@ -1,0 +1,51 @@
+{
+  "cellWidth": 192,
+  "cellHeight": 208,
+  "rows": [
+    {
+      "state": "idle",
+      "displayName": "待机",
+      "frames": 6
+    },
+    {
+      "state": "running-right",
+      "displayName": "向右跑",
+      "frames": 8
+    },
+    {
+      "state": "running-left",
+      "displayName": "向左跑",
+      "frames": 8
+    },
+    {
+      "state": "waving",
+      "displayName": "挥手",
+      "frames": 4
+    },
+    {
+      "state": "jumping",
+      "displayName": "跳跃",
+      "frames": 5
+    },
+    {
+      "state": "failed",
+      "displayName": "失败",
+      "frames": 8
+    },
+    {
+      "state": "waiting",
+      "displayName": "等待",
+      "frames": 6
+    },
+    {
+      "state": "running",
+      "displayName": "奔跑",
+      "frames": 6
+    },
+    {
+      "state": "review",
+      "displayName": "审视",
+      "frames": 6
+    }
+  ]
+}

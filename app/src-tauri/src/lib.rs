@@ -120,8 +120,10 @@ pub fn run() {
                 .app_name("AIPet")
                 .build(),
         )
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             tray::create_tray(app)?;
+            config_manager::seed_default_pets(app.handle())?;
             let cfg = config_manager::read_or_create_app_config(app.handle())?;
 
             if let Some(main_win) = app.get_webview_window("main") {

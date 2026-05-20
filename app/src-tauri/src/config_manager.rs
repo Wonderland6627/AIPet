@@ -234,6 +234,84 @@ pub fn ensure_app_layout(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(root)
 }
 
+/// Copy bundled default pets into the user's pets directory on first launch.
+/// Only runs when the pets directory is empty (no subdirectories with pet.json).
+pub fn seed_default_pets(app: &AppHandle) -> Result<(), String> {
+    let root = ensure_app_layout(app)?;
+    let pets_dir = root.join(PETS_DIR);
+
+    let has_pets = fs::read_dir(&pets_dir)
+        .map(|entries| {
+            entries
+                .flatten()
+                .any(|e| e.path().is_dir() && e.path().join(PET_MANIFEST).exists())
+        })
+        .unwrap_or(false);
+    if has_pets {
+        return Ok(());
+    }
+
+    let resource_dir = app
+        .path()
+        .resource_dir()
+        .map_err(|e| format!("resolve resource dir: {e}"))?
+        .join("bundled-pets");
+    if !resource_dir.exists() {
+        return Ok(());
+    }
+
+    let entries = fs::read_dir(&resource_dir).map_err(|e| format!("read bundled-pets: {e}"))?;
+    let mut first_pet_id: Option<String> = None;
+
+    for entry in entries.flatten() {
+        let src = entry.path();
+        if !src.is_dir() {
+            continue;
+        }
+        if !src.join(PET_MANIFEST).exists() {
+            continue;
+        }
+        let folder_name = entry.file_name().to_string_lossy().to_string();
+        let dest = pets_dir.join(&folder_name);
+        copy_dir_recursive(&src, &dest)?;
+        if first_pet_id.is_none() {
+            first_pet_id = Some(folder_name);
+        }
+    }
+
+    if let Some(pet_id) = first_pet_id {
+        let config_path = root.join(CONFIG_FILE);
+        let mut cfg = if config_path.exists() {
+            read_json::<AppConfig>(&config_path).unwrap_or_default()
+        } else {
+            AppConfig::default()
+        };
+        if cfg.active_pet_id.is_empty() {
+            cfg.active_pet_id = pet_id;
+            write_json(&config_path, &cfg)?;
+        }
+    }
+
+    Ok(())
+}
+
+fn copy_dir_recursive(src: &Path, dest: &Path) -> Result<(), String> {
+    fs::create_dir_all(dest).map_err(|e| format!("create dir {}: {e}", dest.display()))?;
+    let entries = fs::read_dir(src).map_err(|e| format!("read dir {}: {e}", src.display()))?;
+    for entry in entries.flatten() {
+        let src_path = entry.path();
+        let dest_path = dest.join(entry.file_name());
+        if src_path.is_dir() {
+            copy_dir_recursive(&src_path, &dest_path)?;
+        } else {
+            fs::copy(&src_path, &dest_path).map_err(|e| {
+                format!("copy {} -> {}: {e}", src_path.display(), dest_path.display())
+            })?;
+        }
+    }
+    Ok(())
+}
+
 fn read_json<T: for<'de> Deserialize<'de>>(path: &Path) -> Result<T, String> {
     let data = fs::read_to_string(path).map_err(|e| format!("read {}: {e}", path.display()))?;
     serde_json::from_str(&data).map_err(|e| format!("parse {}: {e}", path.display()))

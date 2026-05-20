@@ -28,7 +28,7 @@ export default function App() {
   const [appConfig, setAppConfig] = useState<AppConfig | null>(null);
   const [stateConfig, setStateConfig] = useState<StateConfig | null>(null);
   const [petDetail, setPetDetail] = useState<PetDetailDto | null>(null);
-  const [spritesheetUrl, setSpritesheetUrl] = useState("/spritesheet.webp");
+  const [spritesheetUrl, setSpritesheetUrl] = useState("");
   const [processRow, setProcessRow] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const [dragDirection, setDragDirection] = useState<"left" | "right" | null>(null);
@@ -45,7 +45,7 @@ export default function App() {
   const loadPetAssets = useCallback(async (folderId: string) => {
     if (!folderId) {
       setPetDetail(null);
-      setSpritesheetUrl("/spritesheet.webp");
+      setSpritesheetUrl("");
       return;
     }
     try {
@@ -59,7 +59,7 @@ export default function App() {
       setSpritesheetUrl(convertFileSrc(path));
     } catch {
       setPetDetail(null);
-      setSpritesheetUrl("/spritesheet.webp");
+      setSpritesheetUrl("");
     }
   }, []);
 
@@ -246,21 +246,14 @@ export default function App() {
   const wrapW = Math.round(cellW * scale);
   const wrapH = Math.round(cellH * scale);
 
-  if (!appConfig || !stateConfig) {
+  if (!appConfig || !stateConfig || !spritesheetUrl) {
     return (
       <div
         style={{
           width: 192,
           height: 208,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          fontSize: 11,
-          color: "#999",
         }}
-      >
-        …
-      </div>
+      />
     );
   }
 
