@@ -352,34 +352,39 @@ export function StateConfigSection() {
 
   if (!appCfg?.activePetId) {
     return (
-      <div>
-        <h2 className="mb-4 text-xl font-bold">状态配置</h2>
-        <p className="text-sm text-gray-500">请先在宠物库中设为当前宠物。</p>
+      <div className="flex min-h-full flex-col gap-4">
+        <h2 className="text-xl font-bold">状态配置</h2>
+        <section className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
+          <p className="text-sm text-gray-500">请先在宠物库中设为当前宠物。</p>
+        </section>
       </div>
     );
   }
 
   if (!detail) {
     return (
-      <div>
-        <h2 className="mb-4 text-xl font-bold">状态配置</h2>
-        <p className="text-sm text-gray-500">无法加载当前宠物资源。</p>
+      <div className="flex min-h-full flex-col gap-4">
+        <h2 className="text-xl font-bold">状态配置</h2>
+        <section className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
+          <p className="text-sm text-gray-500">无法加载当前宠物资源。</p>
+        </section>
       </div>
     );
   }
 
   return (
-    <div>
-      <h2 className="mb-2 text-xl font-bold">状态配置</h2>
-      <p className="mb-2 text-xs text-gray-500">
-        当前宠物：{detail.manifest.displayName}。优先级：麦克风 &gt; 挂机 &gt;
-        专注 &gt; 资源占用 &gt; 音频 &gt; 进程聚焦 &gt; 待机。向左跑、向右跑由拖拽触发。
-      </p>
-      {error ? (
-        <p className="mb-3 text-sm text-red-600">{error}</p>
-      ) : null}
+    <div className="flex min-h-full flex-col gap-4">
+      <h2 className="text-xl font-bold">状态配置</h2>
+      <section className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
+        <p className="mb-3 text-xs text-gray-500">
+          当前宠物：{detail.manifest.displayName}。优先级：麦克风 &gt; 挂机 &gt;
+          专注 &gt; 资源占用 &gt; 音频 &gt; 进程聚焦 &gt; 待机。向左跑、向右跑由拖拽触发。
+        </p>
+        {error ? (
+          <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-600">{error}</p>
+        ) : null}
 
-      <ul className="space-y-3">
+        <ul className="space-y-3">
         {mappings.map((mapping) => {
           const triggerOptions = getAvailableTriggerTypes(
             mappings,
@@ -412,10 +417,10 @@ export function StateConfigSection() {
           return (
             <li
               key={mapping.state}
-              className="flex flex-wrap items-start gap-2 rounded-lg border bg-white p-3"
+              className="flex flex-wrap items-start gap-2 rounded-xl border border-gray-100 bg-gray-50 p-3"
             >
               <select
-                className="w-[140px] shrink-0 rounded border px-2 py-1 text-sm"
+                className="w-[140px] shrink-0 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-sm text-gray-700"
                 value={currentType}
                 onChange={(e) => {
                   void changeTriggerType(
@@ -451,7 +456,7 @@ export function StateConfigSection() {
               </div>
 
               <select
-                className="w-[120px] shrink-0 rounded border px-2 py-1 text-sm"
+                className="w-[120px] shrink-0 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-sm text-gray-700"
                 value={currentAnim}
                 onChange={(e) => {
                   void changeAnimation(mapping.state, e.target.value);
@@ -466,7 +471,7 @@ export function StateConfigSection() {
 
               <button
                 type="button"
-                className="shrink-0 rounded px-2 py-1 text-sm text-red-600 hover:bg-red-50"
+                className="shrink-0 rounded-lg border border-red-200 px-2.5 py-1.5 text-sm text-red-500 hover:bg-red-50"
                 title="移除此条件"
                 onClick={() => void removeMapping(mapping.state)}
               >
@@ -475,16 +480,18 @@ export function StateConfigSection() {
             </li>
           );
         })}
-      </ul>
+        </ul>
 
-      <button
-        type="button"
-        className="mt-3 w-full rounded-lg border border-dashed border-gray-400 px-4 py-3 text-sm text-gray-600 hover:border-pink-400 hover:text-pink-600 disabled:cursor-not-allowed disabled:opacity-50"
-        disabled={!canCreate}
-        onClick={() => void handleCreate()}
-      >
-        + 创建条件{!canCreate ? ` ${createDisabledReason}` : ""}
-      </button>
+        <button
+          type="button"
+          className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-pink-300 bg-pink-50/50 px-4 py-3 text-sm font-medium text-pink-600 transition-colors hover:border-pink-400 hover:bg-pink-100/60 disabled:cursor-not-allowed disabled:opacity-50"
+          disabled={!canCreate}
+          onClick={() => void handleCreate()}
+        >
+          <span className="text-lg leading-none">+</span>
+          <span>创建条件{!canCreate ? ` ${createDisabledReason}` : ""}</span>
+        </button>
+      </section>
     </div>
   );
 }
@@ -547,7 +554,7 @@ function TriggerParams({
         ) : null}
         <div className="flex flex-wrap items-center gap-2">
           <select
-            className="min-w-[260px] max-w-full rounded border px-2 py-1 text-sm"
+            className="min-w-[260px] max-w-full rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-sm text-gray-700"
             defaultValue=""
             onMouseDown={onLoadRunningProcesses}
             onFocus={onLoadRunningProcesses}
@@ -565,7 +572,7 @@ function TriggerParams({
             ))}
           </select>
           <input
-            className="min-w-[120px] flex-1 rounded border px-2 py-1 text-sm"
+            className="min-w-[120px] flex-1 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-sm text-gray-700"
             placeholder="或输入进程名(.exe)"
             value={draftProc}
             onChange={(e) => onDraftChange(e.target.value)}
@@ -577,7 +584,7 @@ function TriggerParams({
           />
           <button
             type="button"
-            className="rounded bg-gray-900 px-3 py-1 text-sm text-white"
+            className="rounded-lg bg-pink-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-pink-600"
             onClick={() => {
               onAddProcess(draftProc);
               onDraftChange("");
@@ -594,7 +601,7 @@ function TriggerParams({
     return (
       <div className="flex min-h-8 flex-wrap items-center gap-2">
         <select
-          className="rounded border px-2 py-1 text-sm"
+          className="rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-sm text-gray-700"
           value={t.resource}
           onChange={(e) =>
             onUpdate({
@@ -617,7 +624,7 @@ function TriggerParams({
             type="number"
             min={1}
             max={100}
-            className="w-16 rounded border px-2 py-1"
+            className="w-16 rounded-lg border border-gray-200 bg-white px-2 py-1.5"
             value={t.threshold}
             onChange={(e) =>
               onUpdate({
@@ -641,7 +648,7 @@ function TriggerParams({
           type="number"
           min={1}
           max={999}
-          className="w-20 rounded border px-2 py-1"
+          className="w-20 rounded-lg border border-gray-200 bg-white px-2 py-1.5"
           value={t.minutes}
           onChange={(e) =>
             onUpdate({

@@ -26,7 +26,7 @@ impl Default for AppConfig {
         Self {
             always_on_top: true,
             auto_start: false,
-            animation_speed: 1.0,
+            animation_speed: 0.6,
             animation_scale: 1.0,
             active_pet_id: String::new(),
         }
@@ -260,7 +260,7 @@ fn default_atlas() -> PetAtlas {
             atlas_row("jumping", "跳跃", 5),
             atlas_row("failed", "失败", 8),
             atlas_row("waiting", "等待", 6),
-            atlas_row("running", "奔跑", 6),
+            atlas_row("running", "专注", 6),
             atlas_row("review", "审视", 6),
         ],
     }
@@ -481,4 +481,14 @@ pub fn get_pet_spritesheet_path(app: AppHandle, folder_id: String) -> Result<Str
     let manifest: PetManifest = read_json(&manifest_path)?;
     let spritesheet_abs = dir.join(&manifest.spritesheet_path);
     Ok(spritesheet_abs.to_string_lossy().to_string())
+}
+
+#[tauri::command]
+pub fn delete_pet(app: AppHandle, folder_id: String) -> Result<(), String> {
+    let dir = pet_dir(&app, &folder_id)?;
+    if !dir.exists() {
+        return Err(format!("pet not found: {folder_id}"));
+    }
+    fs::remove_dir_all(&dir).map_err(|e| format!("删除宠物文件夹失败: {e}"))?;
+    Ok(())
 }

@@ -1,6 +1,6 @@
 {
   "productName": "AIPet",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "identifier": "com.wonderland6627.aipet",
   "build": {
     "frontendDist": "../dist",
@@ -31,7 +31,8 @@
         "minHeight": 650,
         "visible": false,
         "decorations": true,
-        "resizable": true
+        "resizable": true,
+        "dragDropEnabled": false
       }
     ],
     "security": {

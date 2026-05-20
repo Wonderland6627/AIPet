@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import PetCanvas from "../components/PetCanvas";
+import { PetCreatorPanel } from "./PetCreatorPanel";
 import type { AppConfig, PetDetailDto, PetListItem } from "../types/aipet";
 
 const PREVIEW_SCALE = 64 / 192;
@@ -20,6 +21,7 @@ export function PetLibrarySection({ onActivePetChanged }: LibraryProps) {
   const [appCfg, setAppCfg] = useState<AppConfig | null>(null);
   const [petsDir, setPetsDir] = useState("");
   const [loadingDetail, setLoadingDetail] = useState(false);
+  const [showCreator, setShowCreator] = useState(false);
 
   const refresh = useCallback(async () => {
     await invoke("refresh_pets_dir");
@@ -105,6 +107,29 @@ export function PetLibrarySection({ onActivePetChanged }: LibraryProps) {
     onActivePetChanged?.();
   }, [selectedId, appCfg, onActivePetChanged]);
 
+  const [deleting, setDeleting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  const deletePet = useCallback(async () => {
+    if (!selectedId || selectedId === activePetId) return;
+    setShowDeleteConfirm(true);
+  }, [selectedId, activePetId]);
+
+  const confirmDelete = useCallback(async () => {
+    if (!selectedId) return;
+    setShowDeleteConfirm(false);
+    setDeleting(true);
+    try {
+      await invoke("delete_pet", { folderId: selectedId });
+      setSelectedId(null);
+      await refresh();
+    } catch (e) {
+      void e;
+    } finally {
+      setDeleting(false);
+    }
+  }, [selectedId, refresh]);
+
   const isActive = selectedId === activePetId;
 
   return (
@@ -125,7 +150,7 @@ export function PetLibrarySection({ onActivePetChanged }: LibraryProps) {
       </p>
 
       {pets.length === 0 ? (
-        <p className="text-sm text-gray-500">暂无宠物，请向 pets 目录添加资源。</p>
+        <p className="text-sm text-gray-500">暂无宠物，请向 pets 目录添加资源或点击下方按钮生成。</p>
       ) : (
         <>
           <div className="mb-4 flex shrink-0 gap-3 overflow-x-auto pb-2">
@@ -212,10 +237,64 @@ export function PetLibrarySection({ onActivePetChanged }: LibraryProps) {
                 >
                   {isActive ? "当前使用中" : "召唤此宠物"}
                 </button>
+                <button
+                  type="button"
+                  disabled={isActive || deleting}
+                  className="rounded-lg border border-red-200 px-4 py-2 text-sm text-red-500 hover:bg-red-50 disabled:cursor-not-allowed disabled:border-gray-200 disabled:text-gray-300"
+                  onClick={() => void deletePet()}
+                >
+                  {deleting ? "删除中..." : "放生此宠物"}
+                </button>
               </div>
             </div>
           ) : null}
         </>
+      )}
+
+      <div className="mt-auto shrink-0 pt-6">
+        <button
+          type="button"
+          className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-pink-300 bg-pink-50/50 px-4 py-3 text-sm font-medium text-pink-600 transition-colors hover:border-pink-400 hover:bg-pink-100/60"
+          onClick={() => setShowCreator(true)}
+        >
+          <span className="text-lg leading-none">+</span>
+          <span>捏一个新宠物</span>
+        </button>
+      </div>
+
+      {showCreator && (
+        <PetCreatorPanel
+          onClose={() => setShowCreator(false)}
+          onCreated={() => void refresh()}
+        />
+      )}
+
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="w-[340px] rounded-2xl bg-white p-6 shadow-2xl">
+            <h3 className="mb-3 text-center text-base font-bold text-gray-800">确认放生</h3>
+            <p className="mb-5 text-center text-sm text-gray-600">
+              确定要放生「{detail?.manifest.displayName ?? selectedId}」吗？<br />
+              <span className="text-xs text-red-400">此操作不可恢复</span>
+            </p>
+            <div className="flex justify-center gap-3">
+              <button
+                type="button"
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm hover:bg-gray-50"
+                onClick={() => setShowDeleteConfirm(false)}
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                className="rounded-lg bg-red-500 px-4 py-2 text-sm font-medium text-white hover:bg-red-600"
+                onClick={() => void confirmDelete()}
+              >
+                确认放生
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -16,4 +16,12 @@ commands.allow = [
   "get_app_data_path",
   "open_app_data_dir",
   "list_running_processes",
+  "get_ai_api_config",
+  "save_ai_api_config",
+  "start_pet_creation",
+  "list_incomplete_tasks",
+  "resume_pet_creation",
+  "cancel_pet_creation",
+  "confirm_base_image",
+  "delete_pet",
 ]

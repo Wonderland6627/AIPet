@@ -1,4 +1,9 @@
+mod ai_api_client;
+mod ai_config;
 mod config_manager;
+mod image_processor;
+mod pet_creator;
+mod prompt_builder;
 mod system_monitor;
 mod tray;
 mod window_detector;
@@ -149,10 +154,18 @@ pub fn run() {
             config_manager::list_pets,
             config_manager::get_pet_detail,
             config_manager::get_pet_spritesheet_path,
+            config_manager::delete_pet,
             config_manager::refresh_pets_dir,
             config_manager::get_app_data_path,
             config_manager::open_app_data_dir,
             system_monitor::list_running_processes,
+            ai_config::get_ai_api_config,
+            ai_config::save_ai_api_config,
+            pet_creator::start_pet_creation,
+            pet_creator::list_incomplete_tasks,
+            pet_creator::resume_pet_creation,
+            pet_creator::cancel_pet_creation,
+            pet_creator::confirm_base_image,
         ])
         .on_menu_event(|app, event| {
             if event.id.as_ref() == "hide_pet" {

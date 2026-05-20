@@ -7,7 +7,7 @@ export const CODEX_BASE_STATES: { state: string; label: string }[] = [
   { state: "jumping", label: "跳跃" },
   { state: "failed", label: "失败" },
   { state: "waiting", label: "等待" },
-  { state: "running", label: "奔跑" },
+  { state: "running", label: "专注" },
   { state: "review", label: "审视" },
 ];
 
@@ -23,7 +23,7 @@ export const DEFAULT_FALLBACK_ROWS = [
   { state: "jumping", displayName: "跳跃", frames: 5 },
   { state: "failed", displayName: "失败", frames: 8 },
   { state: "waiting", displayName: "等待", frames: 6 },
-  { state: "running", displayName: "奔跑", frames: 6 },
+  { state: "running", displayName: "专注", frames: 6 },
   { state: "review", displayName: "审视", frames: 6 },
 ] as const;
 

@@ -71,3 +71,53 @@ export interface PetDetailDto {
 }
 
 export type TriggerType = TriggerConfig["type"];
+
+// AI API Configuration
+export interface AiProviderSettings {
+  apiKey: string;
+  baseUrl: string;
+  model: string;
+}
+
+export interface AiApiConfig {
+  provider: string;
+  apiKey: string;
+  baseUrl: string;
+  model: string;
+  providerCache?: Record<string, AiProviderSettings>;
+}
+
+// Pet Creation
+export interface PetCreationRequest {
+  petName: string;
+  description: string;
+  referenceImage: string | null;
+  stylePreset: string;
+}
+
+export interface PetCreationProgress {
+  taskId: string;
+  step: number;
+  subStep: string;
+  status: "pending" | "running" | "completed" | "failed";
+  message: string;
+  error?: string;
+}
+
+export interface PetCreationResult {
+  taskId: string;
+  petId: string;
+}
+
+export interface PetCreationBaseReady {
+  taskId: string;
+  baseImageB64: string;
+}
+
+export interface IncompleteCreationTask {
+  workDirName: string;
+  petName: string;
+  baseImageDone: boolean;
+  completedCount: number;
+  totalRows: number;
+}
