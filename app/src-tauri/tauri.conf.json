@@ -53,8 +53,13 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "resources": {
-      "bundled-pets/**/*": "bundled-pets/"
+    "resources": [
+      "bundled-pets/**/*"
+    ],
+    "windows": {
+      "nsis": {
+        "installerIcon": "icons/icon.ico"
+      }
     }
   },
   "plugins": {
