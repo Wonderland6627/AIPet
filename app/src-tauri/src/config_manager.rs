@@ -114,22 +114,18 @@ impl Default for StateConfig {
         StateConfig {
             mappings: vec![
                 StateMapping {
-                    state: "jumping".into(),
-                    trigger: TriggerConfig::MicrophoneActive,
-                },
-                StateMapping {
                     state: "waiting".into(),
-                    trigger: TriggerConfig::ComputerIdle { minutes: 5 },
+                    trigger: TriggerConfig::ComputerIdle { minutes: 10 },
                 },
                 StateMapping {
                     state: "idle".into(),
-                    trigger: TriggerConfig::ContinuousFocus { minutes: 60 },
+                    trigger: TriggerConfig::ContinuousFocus { minutes: 10 },
                 },
                 StateMapping {
-                    state: "failed".into(),
+                    state: "jumping".into(),
                     trigger: TriggerConfig::HighResource {
                         resource: "cpu".into(),
-                        threshold: 90,
+                        threshold: 60,
                     },
                 },
                 StateMapping {
@@ -140,23 +136,17 @@ impl Default for StateConfig {
                     state: "running".into(),
                     trigger: TriggerConfig::ProcessFocus {
                         processes: vec![
-                            "cursor.exe".into(),
-                            "code.exe".into(),
-                            "rider.exe".into(),
                             "unity.exe".into(),
-                            "devenv.exe".into(),
+                            "cursor.exe".into(),
+                            "rider64.exe".into(),
+                            "sourcetree.exe".into(),
                         ],
                     },
                 },
                 StateMapping {
                     state: "review".into(),
                     trigger: TriggerConfig::ProcessFocus {
-                        processes: vec![
-                            "photoshop.exe".into(),
-                            "ps.exe".into(),
-                            "afterfx.exe".into(),
-                            "ae.exe".into(),
-                        ],
+                        processes: vec!["excel.exe".into(), "feishu.exe".into()],
                     },
                 },
             ],

@@ -8,7 +8,7 @@ use crate::ai_config::AiApiConfig;
 
 const DASHSCOPE_MIN_PIXELS: u64 = 589_824;
 const DASHSCOPE_MAX_PIXELS: u64 = 16_777_216;
-const OPENAI_MIN_PIXELS: u64 = 1_048_576; // 1024×1024
+const OPENAI_MIN_PIXELS: u64 = 655_360;
 
 #[derive(Debug, Clone, Copy)]
 pub struct ImageSize {
@@ -353,10 +353,11 @@ impl AiApiClient {
 
     // ===== OpenAI (gpt-image-1 / gpt-image-2) =====
 
-    /// Compute generation size for OpenAI.
-    /// Constraints:
-    /// - max aspect ratio in [1:3, 3:1]
-    /// - minimum pixel budget (provider-side dynamic, use conservative 1024×1024)
+    /// Compute generation size for OpenAI (gpt-image-2).
+    /// Constraints (per OpenAI docs):
+    /// - aspect ratio in [1:3, 3:1]
+    /// - both edges multiples of 16
+    /// - total pixels in [655,360 .. 8,294,400]
     fn openai_gen_size(&self, size: ImageSize) -> (String, bool) {
         let (mut gen_w, mut gen_h) = (size.width, size.height);
         let ratio = gen_w as f64 / gen_h as f64;
@@ -367,10 +368,12 @@ impl AiApiClient {
         }
         let pixels = gen_w as u64 * gen_h as u64;
         if pixels < OPENAI_MIN_PIXELS {
-            let scale = (OPENAI_MIN_PIXELS as f64 / pixels as f64).sqrt().ceil() as u32;
-            gen_w *= scale;
-            gen_h *= scale;
+            let scale = (OPENAI_MIN_PIXELS as f64 / pixels as f64).sqrt();
+            gen_w = (gen_w as f64 * scale).ceil() as u32;
+            gen_h = (gen_h as f64 * scale).ceil() as u32;
         }
+        gen_w = (gen_w + 15) & !15;
+        gen_h = (gen_h + 15) & !15;
         let needs_resize = gen_w != size.width || gen_h != size.height;
         (format!("{}x{}", gen_w, gen_h), needs_resize)
     }
@@ -384,7 +387,7 @@ impl AiApiClient {
             "prompt": prompt,
             "n": 1,
             "size": gen_size,
-            "quality": "medium"
+            "quality": "low"
         });
 
         let resp = self
@@ -428,7 +431,7 @@ impl AiApiClient {
             .text("prompt", prompt.to_string())
             .text("n", "1")
             .text("size", gen_size)
-            .text("quality", "medium");
+            .text("quality", "low");
 
         let resp = self
             .client

@@ -83,25 +83,37 @@ fn detect_background_color(img: &RgbaImage) -> Option<(u8, u8, u8)> {
 }
 
 /// Extract individual frames from a horizontal strip by dividing into equal slots.
-/// After slicing, each frame's visible content is re-centered within the 192×208 cell
-/// to compensate for inconsistent positioning across batch-generated strips.
+/// Applies gutter clipping at slot edges to prevent adjacent-frame content leakage,
+/// then re-centers visible content within the 192×208 cell.
 pub fn extract_frames(strip: &RgbaImage, frame_count: u32) -> Vec<RgbaImage> {
     let mut frames = Vec::with_capacity(frame_count as usize);
     let strip_height = strip.height();
     let slot_width = strip.width() / frame_count;
 
+    let gutter = compute_gutter(strip, frame_count, slot_width);
+
     for i in 0..frame_count {
         let x_offset = i * slot_width;
 
-        let copy_w = slot_width.min(CELL_WIDTH);
+        let left_gutter = if i == 0 { 0 } else { gutter };
+        let right_gutter = if i == frame_count - 1 { 0 } else { gutter };
+        let safe_start = x_offset + left_gutter;
+        let safe_end = (x_offset + slot_width).saturating_sub(right_gutter);
+        let safe_width = safe_end.saturating_sub(safe_start);
+        if safe_width == 0 {
+            frames.push(ImageBuffer::new(CELL_WIDTH, CELL_HEIGHT));
+            continue;
+        }
+
+        let copy_w = safe_width.min(CELL_WIDTH);
         let copy_h = strip_height.min(CELL_HEIGHT);
-        let src_x_start = if slot_width > CELL_WIDTH { (slot_width - CELL_WIDTH) / 2 } else { 0 };
+        let src_x_start = if safe_width > CELL_WIDTH { safe_start + (safe_width - CELL_WIDTH) / 2 } else { safe_start };
         let src_y_start = if strip_height > CELL_HEIGHT { (strip_height - CELL_HEIGHT) / 2 } else { 0 };
 
         let mut raw_frame: RgbaImage = ImageBuffer::new(copy_w, copy_h);
         for y in 0..copy_h {
             for x in 0..copy_w {
-                let sx = x_offset + src_x_start + x;
+                let sx = src_x_start + x;
                 let sy = src_y_start + y;
                 if sx < strip.width() && sy < strip.height() {
                     raw_frame.put_pixel(x, y, *strip.get_pixel(sx, sy));
@@ -113,6 +125,44 @@ pub fn extract_frames(strip: &RgbaImage, frame_count: u32) -> Vec<RgbaImage> {
         frames.push(frame);
     }
     frames
+}
+
+/// Decide gutter width using a content-aware approach.
+/// Scans the column transparency at each slot boundary; if there's a clear gap
+/// (mostly transparent column), the gutter can be small. Otherwise fall back to
+/// a percentage-based gutter to clip leaked content.
+fn compute_gutter(strip: &RgbaImage, frame_count: u32, slot_width: u32) -> u32 {
+    if frame_count <= 1 {
+        return 0;
+    }
+
+    let strip_height = strip.height();
+    let scan_range = (slot_width / 10).max(4).min(20);
+    let mut worst_boundary_density: f64 = 0.0;
+
+    for boundary_idx in 1..frame_count {
+        let boundary_x = boundary_idx * slot_width;
+        let mut best_gap_density: f64 = 1.0;
+
+        let scan_start = boundary_x.saturating_sub(scan_range);
+        let scan_end = (boundary_x + scan_range).min(strip.width());
+        for col in scan_start..scan_end {
+            let mut opaque = 0u32;
+            for row in 0..strip_height {
+                if strip.get_pixel(col, row)[3] > 10 {
+                    opaque += 1;
+                }
+            }
+            let density = opaque as f64 / strip_height as f64;
+            best_gap_density = best_gap_density.min(density);
+        }
+        worst_boundary_density = worst_boundary_density.max(best_gap_density);
+    }
+
+    if worst_boundary_density < 0.05 {
+        return (slot_width / 40).max(2).min(6);
+    }
+    (slot_width / 12).max(6).min(20)
 }
 
 /// Find the bounding box of non-transparent pixels and re-center the content

@@ -47,15 +47,15 @@ function defaultTrigger(type: TriggerType): TriggerConfig {
     case "processFocus":
       return { type: "processFocus", processes: [] };
     case "highResource":
-      return { type: "highResource", resource: "cpu", threshold: 90 };
+      return { type: "highResource", resource: "cpu", threshold: 60 };
     case "audioPlaying":
       return { type: "audioPlaying" };
     case "microphoneActive":
       return { type: "microphoneActive" };
     case "continuousFocus":
-      return { type: "continuousFocus", minutes: 60 };
+      return { type: "continuousFocus", minutes: 20 };
     case "computerIdle":
-      return { type: "computerIdle", minutes: 5 };
+      return { type: "computerIdle", minutes: 10 };
     default:
       return { type: "processFocus", processes: [] };
   }
@@ -137,7 +137,7 @@ function pickDefaultTrigger(mappings: StateMapping[]): TriggerConfig | null {
   if (type === "highResource") {
     const resource = pickAvailableResource(mappings, "");
     if (!resource) return null;
-    return { type: "highResource", resource, threshold: 90 };
+    return { type: "highResource", resource, threshold: 60 };
   }
   return defaultTrigger(type);
 }
@@ -275,7 +275,7 @@ export function StateConfigSection() {
         await upsertMapping(state, {
           type: "highResource",
           resource,
-          threshold: 90,
+          threshold: 60,
         });
         return;
       }
@@ -630,7 +630,7 @@ function TriggerParams({
               onUpdate({
                 type: "highResource",
                 resource: t.resource,
-                threshold: Number(e.target.value) || 90,
+                threshold: Number(e.target.value) || 60,
               })
             }
           />

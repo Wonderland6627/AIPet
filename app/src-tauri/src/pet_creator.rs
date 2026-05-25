@@ -152,6 +152,7 @@ pub struct IncompleteCreationTask {
 
 struct ActiveTask {
     cancel_token: CancellationToken,
+    base_confirm_notify: Arc<tokio::sync::Notify>,
 }
 
 static TASKS: std::sync::OnceLock<Arc<Mutex<HashMap<String, ActiveTask>>>> =
@@ -276,6 +277,7 @@ async fn run_creation_pipeline(
     task_id: String,
     request: PetCreationRequest,
     cancel_token: CancellationToken,
+    base_confirm_notify: Arc<tokio::sync::Notify>,
     work_dir_name: Option<String>,
 ) {
     let result = run_pipeline_inner(
@@ -283,6 +285,7 @@ async fn run_creation_pipeline(
         &task_id,
         &request,
         &cancel_token,
+        &base_confirm_notify,
         work_dir_name.as_deref(),
     )
     .await;
@@ -323,6 +326,7 @@ async fn run_pipeline_inner(
     task_id: &str,
     request: &PetCreationRequest,
     cancel_token: &CancellationToken,
+    base_confirm_notify: &tokio::sync::Notify,
     resume_work_dir_name: Option<&str>,
 ) -> Result<String, String> {
     // Step 1: Prepare work directory
@@ -421,7 +425,6 @@ async fn run_pipeline_inner(
     );
 
     if !has_cached_base {
-        // Emit a special event with base image for user confirmation
         let base_b64 = base64::Engine::encode(
             &base64::engine::general_purpose::STANDARD,
             &base_image_bytes,
@@ -433,6 +436,11 @@ async fn run_pipeline_inner(
                 "baseImageB64": base_b64
             }),
         );
+
+        emit_log(app, task_id, "info", "等待用户确认基础形象...");
+        base_confirm_notify.notified().await;
+        check_cancelled(cancel_token)?;
+        emit_log(app, task_id, "info", "用户已确认基础形象，继续生成动画帧");
     }
 
     check_cancelled(cancel_token)?;
@@ -756,9 +764,11 @@ pub async fn start_pet_creation(app: AppHandle, request: PetCreationRequest) -> 
 
     let task_id = Uuid::new_v4().to_string();
     let cancel_token = CancellationToken::new();
+    let base_confirm_notify = Arc::new(tokio::sync::Notify::new());
 
     let task = ActiveTask {
         cancel_token: cancel_token.clone(),
+        base_confirm_notify: base_confirm_notify.clone(),
     };
 
     {
@@ -769,7 +779,7 @@ pub async fn start_pet_creation(app: AppHandle, request: PetCreationRequest) -> 
     let app_clone = app.clone();
     let task_id_clone = task_id.clone();
     tokio::spawn(async move {
-        run_creation_pipeline(app_clone, task_id_clone, request, cancel_token, None).await;
+        run_creation_pipeline(app_clone, task_id_clone, request, cancel_token, base_confirm_notify, None).await;
     });
 
     Ok(task_id)
@@ -836,8 +846,10 @@ pub async fn resume_pet_creation(app: AppHandle, work_dir_name: String) -> Resul
 
     let task_id = Uuid::new_v4().to_string();
     let cancel_token = CancellationToken::new();
+    let base_confirm_notify = Arc::new(tokio::sync::Notify::new());
     let task = ActiveTask {
         cancel_token: cancel_token.clone(),
+        base_confirm_notify: base_confirm_notify.clone(),
     };
 
     {
@@ -854,6 +866,7 @@ pub async fn resume_pet_creation(app: AppHandle, work_dir_name: String) -> Resul
             task_id_clone,
             request,
             cancel_token,
+            base_confirm_notify,
             Some(work_dir_name),
         )
         .await;
@@ -875,11 +888,13 @@ pub async fn cancel_pet_creation(_app: AppHandle, task_id: String) -> Result<(),
 
 #[tauri::command]
 pub async fn confirm_base_image(task_id: String, confirmed: bool) -> Result<(), String> {
+    let map = tasks().lock().await;
+    let Some(task) = map.get(&task_id) else {
+        return Err("任务不存在或已完成".into());
+    };
     if !confirmed {
-        let map = tasks().lock().await;
-        if let Some(task) = map.get(&task_id) {
-            task.cancel_token.cancel();
-        }
+        task.cancel_token.cancel();
     }
+    task.base_confirm_notify.notify_one();
     Ok(())
 }
