@@ -54,7 +54,7 @@ CI 发布流程当前固定为 NSIS（`--bundles nsis`）以避免 GitHub Runner
 项目通过 GitHub Actions 自动构建发布：
 
 1. 更新版本号（`tauri.conf.json`、`Cargo.toml`、`package.json` 三处保持一致）
-2. 提交并推送与当前应用版本一致的 tag（例如当前版本是 `0.4.0` 时使用 `v0.4.0`）：
+2. 提交并推送与当前应用版本一致的 tag（例如当前版本是 `0.5.0` 时使用 `v0.5.0`）：
    ```bash
    git tag v<version>
    git push origin v<version>
