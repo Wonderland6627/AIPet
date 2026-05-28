@@ -4,12 +4,12 @@ use tauri::{
     Manager,
 };
 
-fn create_placeholder_icon() -> tauri::image::Image<'static> {
-    let size = 32u32;
-    let rgba: Vec<u8> = (0..size * size)
-        .flat_map(|_| [236u8, 72, 153, 255])
-        .collect();
-    tauri::image::Image::new_owned(rgba, size, size)
+fn create_tray_icon() -> tauri::image::Image<'static> {
+    let rgba = image::load_from_memory(include_bytes!("../icons/32x32.png"))
+        .expect("tray icon must be a valid image")
+        .to_rgba8();
+    let (width, height) = rgba.dimensions();
+    tauri::image::Image::new_owned(rgba.into_raw(), width, height)
 }
 
 pub fn create_tray(app: &tauri::App) -> tauri::Result<()> {
@@ -18,7 +18,7 @@ pub fn create_tray(app: &tauri::App) -> tauri::Result<()> {
     let quit_i = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
     let menu = Menu::with_items(app, &[&show_pet_i, &settings_i, &quit_i])?;
 
-    let icon = create_placeholder_icon();
+    let icon = create_tray_icon();
 
     TrayIconBuilder::new()
         .icon(icon)
