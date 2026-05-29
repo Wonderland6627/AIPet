@@ -1,6 +1,6 @@
 {
   "productName": "AIPet",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "identifier": "com.wonderland6627.aipet",
   "build": {
     "frontendDist": "../dist",
