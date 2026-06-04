@@ -63,13 +63,20 @@ fn normalize_process_name(raw: &str) -> Option<String> {
     }
     let base = trimmed.rsplit(['\\', '/']).next().unwrap_or(trimmed);
     let lower = base.to_lowercase();
-    if lower.ends_with(".exe") {
-        return Some(lower);
+    #[cfg(windows)]
+    {
+        if lower.ends_with(".exe") {
+            return Some(lower);
+        }
+        return Some(format!("{lower}.exe"));
     }
-    Some(format!("{lower}.exe"))
+    #[cfg(not(windows))]
+    {
+        Some(lower.strip_suffix(".app").unwrap_or(&lower).to_string())
+    }
 }
 
-fn display_name_without_exe(raw: &str) -> String {
+fn display_name_without_ext(raw: &str) -> String {
     let trimmed = raw.trim();
     if trimmed.is_empty() {
         return String::new();
@@ -78,10 +85,10 @@ fn display_name_without_exe(raw: &str) -> String {
         return trimmed.to_string();
     }
     let lower = trimmed.to_ascii_lowercase();
-    if !lower.ends_with(".exe") {
-        return trimmed.to_string();
+    if lower.ends_with(".exe") || lower.ends_with(".app") {
+        return trimmed[..trimmed.len() - 4].to_string();
     }
-    trimmed[..trimmed.len() - 4].to_string()
+    trimmed.to_string()
 }
 
 #[cfg(windows)]
@@ -174,7 +181,36 @@ fn process_file_description(path: &std::path::Path) -> Option<String> {
     query_value("\\StringFileInfo\\040904b0\\FileDescription")
 }
 
-#[cfg(not(windows))]
+#[cfg(target_os = "macos")]
+fn process_file_description(path: &std::path::Path) -> Option<String> {
+    let mut current = path.to_path_buf();
+    loop {
+        if current.extension().and_then(|e| e.to_str()) == Some("app") {
+            let plist_path = current.join("Contents").join("Info.plist");
+            if plist_path.exists() {
+                if let Ok(plist) = plist::Value::from_file(&plist_path) {
+                    if let Some(dict) = plist.as_dictionary() {
+                        let name = dict
+                            .get("CFBundleDisplayName")
+                            .or_else(|| dict.get("CFBundleName"))
+                            .and_then(|v| v.as_string())
+                            .map(|s| s.trim().to_string())
+                            .filter(|s| !s.is_empty());
+                        if name.is_some() {
+                            return name;
+                        }
+                    }
+                }
+            }
+            return None;
+        }
+        if !current.pop() {
+            return None;
+        }
+    }
+}
+
+#[cfg(not(any(windows, target_os = "macos")))]
 fn process_file_description(_path: &std::path::Path) -> Option<String> {
     None
 }
@@ -186,11 +222,11 @@ fn resolve_process_display_name(process: &sysinfo::Process, normalized_exe: &str
         }
     }
     let raw = process.name().to_string_lossy();
-    let raw_display = display_name_without_exe(&raw);
+    let raw_display = display_name_without_ext(&raw);
     if !raw_display.is_empty() {
         return raw_display;
     }
-    let exe_display = display_name_without_exe(normalized_exe);
+    let exe_display = display_name_without_ext(normalized_exe);
     if !exe_display.is_empty() {
         return exe_display;
     }

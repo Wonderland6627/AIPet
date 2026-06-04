@@ -168,11 +168,13 @@ function describeTriggerReason(
   }
 }
 
-export function normalizeExe(raw: string): string {
+export function normalizeProcessName(raw: string, platform: string): string {
   const v = raw.trim().toLowerCase();
   if (!v) return "";
-  if (v.endsWith(".exe")) return v;
-  return `${v}.exe`;
+  if (platform === "windows") {
+    return v.endsWith(".exe") ? v : `${v}.exe`;
+  }
+  return v.endsWith(".app") ? v.slice(0, -4) : v;
 }
 
 /** 校验唯一性：返回错误信息，空字符串表示通过。 */

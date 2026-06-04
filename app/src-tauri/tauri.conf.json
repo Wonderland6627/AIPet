@@ -1,6 +1,6 @@
 {
   "productName": "AIPet",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "identifier": "com.wonderland6627.aipet",
   "build": {
     "frontendDist": "../dist",
@@ -9,6 +9,7 @@
     "beforeBuildCommand": "pnpm build"
   },
   "app": {
+    "macOSPrivateApi": true,
     "windows": [
       {
         "label": "main",
@@ -60,6 +61,13 @@
       "nsis": {
         "installerIcon": "icons/icon.ico"
       }
+    },
+    "macOS": {
+      "dmg": {
+        "appPosition": { "x": 180, "y": 170 },
+        "applicationFolderPosition": { "x": 480, "y": 170 }
+      },
+      "minimumSystemVersion": "10.15"
     }
   },
   "plugins": {

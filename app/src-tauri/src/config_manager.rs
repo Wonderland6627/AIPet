@@ -135,18 +135,25 @@ impl Default for StateConfig {
                 StateMapping {
                     state: "running".into(),
                     trigger: TriggerConfig::ProcessFocus {
-                        processes: vec![
-                            "unity.exe".into(),
-                            "cursor.exe".into(),
-                            "rider64.exe".into(),
-                            "sourcetree.exe".into(),
-                        ],
+                        processes: {
+                            #[cfg(windows)]
+                            { vec!["unity.exe".into(), "cursor.exe".into(), "rider64.exe".into(), "sourcetree.exe".into()] }
+                            #[cfg(target_os = "macos")]
+                            { vec!["unity".into(), "cursor".into(), "rider".into(), "sourcetree".into()] }
+                            #[cfg(not(any(windows, target_os = "macos")))]
+                            { vec!["unity".into(), "cursor".into()] }
+                        },
                     },
                 },
                 StateMapping {
                     state: "review".into(),
                     trigger: TriggerConfig::ProcessFocus {
-                        processes: vec!["excel.exe".into(), "feishu.exe".into()],
+                        processes: {
+                            #[cfg(windows)]
+                            { vec!["excel.exe".into(), "feishu.exe".into()] }
+                            #[cfg(not(windows))]
+                            { vec!["microsoft excel".into(), "feishu".into()] }
+                        },
                     },
                 },
             ],
@@ -456,17 +463,26 @@ pub fn get_app_data_path(app: AppHandle) -> Result<String, String> {
 #[tauri::command]
 pub fn open_app_data_dir(app: AppHandle) -> Result<(), String> {
     let root = ensure_app_layout(&app)?;
-    #[cfg(windows)]
+    #[cfg(target_os = "windows")]
     {
         std::process::Command::new("explorer")
-            .arg(root)
+            .arg(&root)
             .spawn()
             .map_err(|e| format!("open dir: {e}"))?;
     }
-    #[cfg(not(windows))]
+    #[cfg(target_os = "macos")]
     {
-        let _ = root;
-        return Err("open_app_data_dir is only supported on Windows".into());
+        std::process::Command::new("open")
+            .arg(&root)
+            .spawn()
+            .map_err(|e| format!("open dir: {e}"))?;
+    }
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+    {
+        std::process::Command::new("xdg-open")
+            .arg(&root)
+            .spawn()
+            .map_err(|e| format!("open dir: {e}"))?;
     }
     Ok(())
 }

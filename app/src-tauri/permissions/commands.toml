@@ -2,6 +2,7 @@
 identifier = "allow-aipet-commands"
 description = "Allow AIPet custom IPC commands for settings and pet data."
 commands.allow = [
+  "get_platform",
   "show_pet_menu",
   "clamp_main_window_to_screen",
   "reset_main_window_position",

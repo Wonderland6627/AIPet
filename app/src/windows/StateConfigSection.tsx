@@ -17,7 +17,7 @@ import type {
 } from "../types/aipet";
 import {
   getUsedResources,
-  normalizeExe,
+  normalizeProcessName,
   pickAvailableResource,
   validateMappingUniqueness,
 } from "../utils/triggerResolver";
@@ -153,6 +153,11 @@ export function StateConfigSection() {
   const [draftProc, setDraftProc] = useState<Record<string, string>>({});
   const [runningProcesses, setRunningProcesses] = useState<RunningProcessItem[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [platform, setPlatform] = useState("windows");
+
+  useEffect(() => {
+    invoke<string>("get_platform").then(setPlatform).catch(() => {});
+  }, []);
 
   const load = useCallback(async () => {
     const c = await invoke<AppConfig>("get_app_config");
@@ -288,7 +293,7 @@ export function StateConfigSection() {
     async (state: string, raw: string) => {
       const cur = mappings.find((m) => m.state === state);
       if (!cur || cur.trigger.type !== "processFocus") return;
-      const name = normalizeExe(raw);
+      const name = normalizeProcessName(raw, platform);
       if (!name) return;
       if (cur.trigger.processes.some((x) => x.toLowerCase() === name)) return;
       await upsertMapping(state, {
@@ -443,6 +448,7 @@ export function StateConfigSection() {
                   draftProc={draft}
                   runningProcesses={runningProcesses}
                   globalUsedProcs={globalUsedProcs}
+                  platform={platform}
                   onDraftChange={(v) =>
                     setDraftProc((d) => ({ ...d, [mapping.state]: v }))
                   }
@@ -502,6 +508,7 @@ function TriggerParams({
   draftProc,
   runningProcesses,
   globalUsedProcs,
+  platform,
   onDraftChange,
   onUpdate,
   onAddProcess,
@@ -513,6 +520,7 @@ function TriggerParams({
   draftProc: string;
   runningProcesses: RunningProcessItem[];
   globalUsedProcs: Set<string>;
+  platform: string;
   onDraftChange: (v: string) => void;
   onUpdate: (t: TriggerConfig) => void;
   onAddProcess: (raw: string) => void;
@@ -573,7 +581,7 @@ function TriggerParams({
           </select>
           <input
             className="min-w-[120px] flex-1 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-sm text-gray-700"
-            placeholder="或输入进程名(.exe)"
+            placeholder={platform === "windows" ? "或输入进程名(.exe)" : "或输入应用名"}
             value={draftProc}
             onChange={(e) => onDraftChange(e.target.value)}
             onKeyDown={(e) => {

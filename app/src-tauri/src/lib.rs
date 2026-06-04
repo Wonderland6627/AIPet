@@ -12,6 +12,16 @@ use tauri::menu::{Menu, MenuItem};
 use tauri::{Manager, PhysicalPosition};
 
 #[tauri::command]
+fn get_platform() -> &'static str {
+    #[cfg(target_os = "windows")]
+    { "windows" }
+    #[cfg(target_os = "macos")]
+    { "macos" }
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+    { "linux" }
+}
+
+#[tauri::command]
 fn show_pet_menu(window: tauri::WebviewWindow) -> Result<(), String> {
     let app = window.app_handle();
     let hide = MenuItem::with_id(app, "hide_pet", "隐藏宠物", true, None::<&str>)
@@ -122,6 +132,9 @@ pub fn run() {
         )
         .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
+            #[cfg(target_os = "macos")]
+            app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+
             tray::create_tray(app)?;
             config_manager::seed_default_pets(app.handle())?;
             let cfg = config_manager::read_or_create_app_config(app.handle())?;
@@ -146,6 +159,7 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            get_platform,
             show_pet_menu,
             clamp_main_window_to_screen,
             reset_main_window_position,
