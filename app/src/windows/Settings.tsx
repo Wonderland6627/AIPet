@@ -61,8 +61,8 @@ export default function Settings() {
       {showModal && (
         <UpdateModal
           state={updater.state}
-          onDownload={() => void updater.downloadAndInstall()}
-          onRestart={() => void updater.restartNow()}
+          onDownload={() => void updater.downloadUpdate()}
+          onRestart={() => void updater.installAndRestart()}
           onClose={updater.dismiss}
         />
       )}

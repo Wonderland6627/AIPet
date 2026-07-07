@@ -54,7 +54,10 @@ export function useAppUpdater() {
     }
   }, []);
 
-  const downloadAndInstall = useCallback(async () => {
+  // 注意：这里只下载，不调用 downloadAndInstall。Windows 上 install 会立刻
+  // std::process::exit 杀掉当前进程交给 NSIS 完成替换，如果和下载合并成一步，
+  // 用户根本来不及在"下载完成"弹窗里做选择，进程就已经被杀掉重启了。
+  const downloadUpdate = useCallback(async () => {
     const update = pendingUpdate.current;
     if (!update) return;
 
@@ -62,7 +65,7 @@ export function useAppUpdater() {
     let downloaded = 0;
     setState((prev) => ({ ...prev, status: "downloading", progress: 0 }));
     try {
-      await update.downloadAndInstall((event) => {
+      await update.download((event) => {
         switch (event.event) {
           case "Started":
             total = event.data.contentLength ?? 0;
@@ -86,8 +89,19 @@ export function useAppUpdater() {
     }
   }, []);
 
-  const restartNow = useCallback(async () => {
-    await relaunch();
+  // 用户在"下载完成"弹窗里明确点击"立即重启"后才会执行到这里：
+  // install() 才是真正触发安装的动作，Windows 上会导致进程退出，
+  // relaunch() 之后的代码在 Windows 上不一定会执行到，但保留它以覆盖
+  // macOS 等 install 后不会自动退出进程的平台。
+  const installAndRestart = useCallback(async () => {
+    const update = pendingUpdate.current;
+    if (!update) return;
+    try {
+      await update.install();
+      await relaunch();
+    } catch (e) {
+      setState({ status: "error", progress: 0, error: String(e) });
+    }
   }, []);
 
   const dismiss = useCallback(() => {
@@ -101,5 +115,5 @@ export function useAppUpdater() {
     return () => clearTimeout(timer);
   }, [state.status]);
 
-  return { state, checkForUpdate, downloadAndInstall, restartNow, dismiss };
+  return { state, checkForUpdate, downloadUpdate, installAndRestart, dismiss };
 }
