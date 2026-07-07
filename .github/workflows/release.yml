@@ -152,16 +152,23 @@ jobs:
       contents: write
 
     steps:
+      # GitHub API 偶尔会返回瞬时的 5xx 错误，这里对下载/上传各做几次重试，
+      # 避免因为一次偶发抖动导致整条发布流水线失败。
       - name: Download manifest fragments
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           mkdir -p manifests
-          gh release download "${{ github.ref_name }}" \
-            --repo "${{ github.repository }}" \
-            --pattern "latest-*.json" \
-            --dir manifests \
-            --clobber
+          for i in 1 2 3 4 5; do
+            gh release download "${{ github.ref_name }}" \
+              --repo "${{ github.repository }}" \
+              --pattern "latest-*.json" \
+              --dir manifests \
+              --clobber && break
+            echo "Download attempt $i failed, retrying in 10s..."
+            sleep 10
+          done
+          ls manifests
 
       - name: Merge into latest.json
         run: |
@@ -177,6 +184,11 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release upload "${{ github.ref_name }}" latest.json \
-            --repo "${{ github.repository }}" \
-            --clobber
+          for i in 1 2 3 4 5; do
+            gh release upload "${{ github.ref_name }}" latest.json \
+              --repo "${{ github.repository }}" \
+              --clobber && exit 0
+            echo "Upload attempt $i failed, retrying in 10s..."
+            sleep 10
+          done
+          exit 1
