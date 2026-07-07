@@ -40,14 +40,38 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: pnpm tauri build --bundles nsis
 
+      # `tauri build` 只生成安装包与 .sig 签名文件，并不会自动产出 updater 需要的
+      # latest.json 清单，这里手动拼装该平台的清单片段，交给最后的 publish-manifest
+      # job 合并成完整的 latest.json。
+      - name: Generate updater manifest fragment (windows)
+        working-directory: app
+        shell: pwsh
+        run: |
+          $version = (Get-Content src-tauri/tauri.conf.json | ConvertFrom-Json).version
+          $sigFile = Get-ChildItem -Path "src-tauri/target/release/bundle/nsis" -Filter "*.exe.sig" | Select-Object -First 1
+          $sig = (Get-Content $sigFile.FullName -Raw).Trim()
+          $exeName = $sigFile.Name -replace '\.sig$', ''
+          $pubDate = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+          $manifest = [ordered]@{
+            version   = $version
+            notes     = "AIPet v$version"
+            pub_date  = $pubDate
+            platforms = [ordered]@{
+              "windows-x86_64" = [ordered]@{
+                signature = $sig
+                url       = "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/$exeName"
+              }
+            }
+          }
+          $manifest | ConvertTo-Json -Depth 5 | Set-Content -Path "latest-windows.json" -Encoding utf8NoBOM
+
       - name: Upload release assets
         uses: softprops/action-gh-release@v2
         with:
           files: |
             app/src-tauri/target/release/bundle/nsis/*.exe
-            app/src-tauri/target/release/bundle/nsis/*.zip
             app/src-tauri/target/release/bundle/nsis/*.sig
-            app/src-tauri/target/release/bundle/**/latest.json
+            app/latest-windows.json
 
   build-macos:
     runs-on: macos-latest
@@ -77,12 +101,37 @@ jobs:
         working-directory: app
         run: pnpm install
 
+      # 需要显式包含 `app` bundle target，updater 所需的 .app.tar.gz(.sig) 才会被生成；
+      # 仅构建 dmg 不会产出这两个文件。
       - name: Build Tauri app
         working-directory: app
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        run: pnpm tauri build --bundles dmg
+        run: pnpm tauri build --bundles app,dmg
+
+      - name: Generate updater manifest fragment (macos)
+        working-directory: app
+        run: |
+          set -euo pipefail
+          VERSION=$(node -p "require('./package.json').version")
+          SIG_FILE=$(find src-tauri/target/release/bundle/macos -name "*.app.tar.gz.sig" | head -n 1)
+          SIG=$(cat "$SIG_FILE")
+          ARCHIVE_NAME=$(basename "${SIG_FILE%.sig}")
+          PUB_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          cat > latest-macos.json <<EOF
+          {
+            "version": "$VERSION",
+            "notes": "AIPet v$VERSION",
+            "pub_date": "$PUB_DATE",
+            "platforms": {
+              "darwin-aarch64": {
+                "signature": "$SIG",
+                "url": "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/$ARCHIVE_NAME"
+              }
+            }
+          }
+          EOF
 
       - name: Upload release assets
         uses: softprops/action-gh-release@v2
@@ -91,4 +140,43 @@ jobs:
             app/src-tauri/target/release/bundle/dmg/*.dmg
             app/src-tauri/target/release/bundle/macos/*.app.tar.gz
             app/src-tauri/target/release/bundle/macos/*.app.tar.gz.sig
-            app/src-tauri/target/release/bundle/**/latest.json
+            app/latest-macos.json
+
+  # 汇总 Windows / macOS 两个 job 各自生成的清单片段，合并成 updater 端点
+  # (`releases/latest/download/latest.json`) 实际读取的完整清单。
+  publish-manifest:
+    needs: [build-windows, build-macos]
+    if: always()
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download manifest fragments
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p manifests
+          gh release download "${{ github.ref_name }}" \
+            --repo "${{ github.repository }}" \
+            --pattern "latest-*.json" \
+            --dir manifests \
+            --clobber
+
+      - name: Merge into latest.json
+        run: |
+          jq -s '{
+            version: .[0].version,
+            notes: .[0].notes,
+            pub_date: .[0].pub_date,
+            platforms: (map(.platforms) | add)
+          }' manifests/latest-*.json > latest.json
+          cat latest.json
+
+      - name: Upload merged manifest
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "${{ github.ref_name }}" latest.json \
+            --repo "${{ github.repository }}" \
+            --clobber

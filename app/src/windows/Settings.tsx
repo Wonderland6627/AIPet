@@ -1,8 +1,11 @@
+import { useEffect } from "react";
 import { NavLink, Route, Routes, Navigate } from "react-router-dom";
 import { PetLibrarySection } from "./PetLibrarySection";
 import { StateConfigSection } from "./StateConfigSection";
 import { AppSettingsSection } from "./AppSettingsSection";
 import { PetStatusPanel } from "./PetStatusPanel";
+import { UpdateModal } from "./UpdateModal";
+import { useAppUpdater } from "../hooks/useAppUpdater";
 
 const NAV_ITEMS = [
   { to: "/pets", label: "宠物库" },
@@ -11,6 +14,20 @@ const NAV_ITEMS = [
 ];
 
 export default function Settings() {
+  const updater = useAppUpdater();
+
+  useEffect(() => {
+    void updater.checkForUpdate(true);
+    // 仅在设置窗口首次挂载时静默检查一次
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const showModal =
+    updater.state.status === "available" ||
+    updater.state.status === "downloading" ||
+    updater.state.status === "ready" ||
+    updater.state.status === "error";
+
   return (
     <div className="flex h-screen bg-white text-gray-900">
       <nav className="flex h-full w-44 shrink-0 flex-col gap-1 border-r border-gray-200 bg-gray-50 p-4">
@@ -36,10 +53,19 @@ export default function Settings() {
         <Routes>
           <Route path="/pets" element={<PetLibrarySection />} />
           <Route path="/states" element={<StateConfigSection />} />
-          <Route path="/app" element={<AppSettingsSection />} />
+          <Route path="/app" element={<AppSettingsSection updater={updater} />} />
           <Route path="*" element={<Navigate to="/pets" replace />} />
         </Routes>
       </main>
+
+      {showModal && (
+        <UpdateModal
+          state={updater.state}
+          onDownload={() => void updater.downloadAndInstall()}
+          onRestart={() => void updater.restartNow()}
+          onClose={updater.dismiss}
+        />
+      )}
     </div>
   );
 }

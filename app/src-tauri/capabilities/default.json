@@ -19,6 +19,7 @@
     "core:window:allow-outer-position",
     "core:window:allow-outer-size",
     "core:window:allow-current-monitor",
-    "updater:default"
+    "updater:default",
+    "process:allow-restart"
   ]
 }

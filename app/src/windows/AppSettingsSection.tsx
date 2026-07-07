@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { getVersion } from "@tauri-apps/api/app";
 import { listen } from "@tauri-apps/api/event";
 import type { AiApiConfig, AppConfig } from "../types/aipet";
+import type { useAppUpdater } from "../hooks/useAppUpdater";
 
 function ToggleSwitch({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
   return (
@@ -20,7 +21,11 @@ function ToggleSwitch({ checked, onChange }: { checked: boolean; onChange: (v: b
   );
 }
 
-export function AppSettingsSection() {
+interface AppSettingsSectionProps {
+  updater: ReturnType<typeof useAppUpdater>;
+}
+
+export function AppSettingsSection({ updater }: AppSettingsSectionProps) {
   const [cfg, setCfg] = useState<AppConfig | null>(null);
   const [dataPath, setDataPath] = useState("");
   const [appVersion, setAppVersion] = useState("");
@@ -154,9 +159,20 @@ export function AppSettingsSection() {
       </section>
 
       {/* 版本 */}
-      <p className="mt-auto text-center text-xs text-gray-300">
-        AIPet v{appVersion || "—"}
-      </p>
+      <div className="mt-auto flex flex-col items-center gap-1.5">
+        <p className="text-center text-xs text-gray-300">AIPet v{appVersion || "—"}</p>
+        <button
+          type="button"
+          disabled={updater.state.status === "checking"}
+          className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs text-gray-600 transition hover:border-pink-300 hover:text-pink-600 disabled:cursor-not-allowed disabled:opacity-50"
+          onClick={() => void updater.checkForUpdate(false)}
+        >
+          {updater.state.status === "checking" ? "检查中…" : "检查更新"}
+        </button>
+        {updater.state.status === "up-to-date" && (
+          <p className="text-xs text-gray-400">已是最新版本</p>
+        )}
+      </div>
 
       {showAiConfig && <AiConfigModal onClose={() => setShowAiConfig(false)} />}
     </div>
