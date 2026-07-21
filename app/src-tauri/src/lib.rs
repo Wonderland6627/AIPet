@@ -4,6 +4,8 @@ mod config_manager;
 mod image_processor;
 mod pet_creator;
 mod prompt_builder;
+mod remote_config;
+mod remote_creation;
 mod system_monitor;
 mod tray;
 mod window_detector;
@@ -183,6 +185,13 @@ pub fn run() {
             pet_creator::resume_pet_creation,
             pet_creator::cancel_pet_creation,
             pet_creator::confirm_base_image,
+            remote_config::get_remote_server_config,
+            remote_config::save_remote_server_config,
+            remote_creation::get_remote_server_status,
+            remote_creation::start_remote_pet_creation,
+            remote_creation::cancel_remote_pet_creation,
+            remote_creation::confirm_remote_base_image,
+            remote_creation::import_pet_zip_file,
         ])
         .on_menu_event(|app, event| {
             if event.id.as_ref() == "hide_pet" {

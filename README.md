@@ -12,10 +12,25 @@ AIPet/
 │   │   ├── assets/       #   编译时嵌入的资源（layout guides 等）
 │   │   └── bundled-pets/ #   随安装包分发的内置默认宠物
 │   └── package.json
+├── crates/aipet-core/    # 共享生成核心（本地与远程服务复用）
+├── server/               # 内网捏宠服务端（Windows）
 ├── docs/                 # 版本变更文档
 ├── .github/workflows/    # CI/CD 自动构建发布
 └── README.md
 ```
+
+## 远程捏宠服务（可选）
+
+若希望其他电脑不直接配置 AI API，可在本机启动内网服务：
+
+```bash
+cd server
+copy config.example.json ai-config.json
+# 编辑 ai-config.json 填入 Key
+start-server.bat
+```
+
+客户端在「捏宠物」面板选择「我的生成服务」，填写 `http://<本机内网IP>:8787`。服务全局一次只跑一个任务，可查看离线/空闲/生成中/等待确认状态。详见 [server/README.md](server/README.md)。
 
 ## 前置依赖
 

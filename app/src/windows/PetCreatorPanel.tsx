@@ -7,6 +7,9 @@ import type {
   PetCreationResult,
   PetCreationBaseReady,
   IncompleteCreationTask,
+  CreationMode,
+  RemoteServerConfig,
+  RemoteServerStatus,
 } from "../types/aipet";
 
 interface PetCreatorPanelProps {
@@ -80,10 +83,18 @@ export function PetCreatorPanel({ onClose, onCreated }: PetCreatorPanelProps) {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [showLogs, setShowLogs] = useState(false);
   const [incompleteTasks, setIncompleteTasks] = useState<IncompleteCreationTask[]>([]);
+  const [creationMode, setCreationMode] = useState<CreationMode>("local");
+  const [remoteBaseUrl, setRemoteBaseUrl] = useState("http://127.0.0.1:8787");
+  const [remoteStatus, setRemoteStatus] = useState<RemoteServerStatus | null>(null);
+  const [remoteTaskId, setRemoteTaskId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const logEndRef = useRef<HTMLDivElement>(null);
 
-  const canSubmit = (petName.trim() && (description.trim() || referenceImage)) && !submitting;
+  const canSubmit =
+    Boolean(petName.trim() && (description.trim() || referenceImage)) &&
+    !submitting &&
+    (creationMode === "local" ||
+      (remoteStatus?.online === true && remoteStatus.state === "idle"));
 
   const loadResumeTasks = useCallback(async () => {
     try {
@@ -94,9 +105,46 @@ export function PetCreatorPanel({ onClose, onCreated }: PetCreatorPanelProps) {
     }
   }, []);
 
+  const loadRemoteConfig = useCallback(async () => {
+    try {
+      const cfg = await invoke<RemoteServerConfig>("get_remote_server_config");
+      setCreationMode(cfg.mode);
+      setRemoteBaseUrl(cfg.baseUrl || "http://127.0.0.1:8787");
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const refreshRemoteStatus = useCallback(async () => {
+    if (creationMode !== "remote") {
+      setRemoteStatus(null);
+      return;
+    }
+    try {
+      const status = await invoke<RemoteServerStatus>("get_remote_server_status");
+      setRemoteStatus(status);
+    } catch (e) {
+      setRemoteStatus({
+        online: false,
+        state: "offline",
+        error: String(e),
+      });
+    }
+  }, [creationMode]);
+
   useEffect(() => {
     void loadResumeTasks();
-  }, [loadResumeTasks]);
+    void loadRemoteConfig();
+  }, [loadResumeTasks, loadRemoteConfig]);
+
+  useEffect(() => {
+    if (creationMode !== "remote" || phase !== "input") return;
+    void refreshRemoteStatus();
+    const id = window.setInterval(() => {
+      void refreshRemoteStatus();
+    }, 4000);
+    return () => window.clearInterval(id);
+  }, [creationMode, phase, refreshRemoteStatus]);
 
   // Listen for progress events
   useEffect(() => {
@@ -168,7 +216,18 @@ export function PetCreatorPanel({ onClose, onCreated }: PetCreatorPanelProps) {
       (e) => {
         if (taskId && e.payload.taskId !== taskId) return;
         setBaseImageB64(e.payload.baseImageB64);
+        if (e.payload.remoteTaskId) {
+          setRemoteTaskId(e.payload.remoteTaskId);
+        }
         setPhase("base-confirm");
+      },
+    );
+
+    const unlistenRemoteMeta = listen<{ taskId: string; remoteTaskId: string }>(
+      "pet-creation-remote-meta",
+      (e) => {
+        if (taskId && e.payload.taskId !== taskId) return;
+        setRemoteTaskId(e.payload.remoteTaskId);
       },
     );
 
@@ -186,6 +245,7 @@ export function PetCreatorPanel({ onClose, onCreated }: PetCreatorPanelProps) {
       unlistenFailed.then((fn) => fn());
       unlistenCancelled.then((fn) => fn());
       unlistenBaseReady.then((fn) => fn());
+      unlistenRemoteMeta.then((fn) => fn());
       unlistenLog.then((fn) => fn());
     };
   }, [taskId]);
@@ -199,6 +259,7 @@ export function PetCreatorPanel({ onClose, onCreated }: PetCreatorPanelProps) {
   const handleReset = useCallback(() => {
     setPhase("input");
     setTaskId(null);
+    setRemoteTaskId(null);
     setSteps(INITIAL_STEPS);
     setErrorMessage("");
     setBaseImageB64(null);
@@ -206,12 +267,34 @@ export function PetCreatorPanel({ onClose, onCreated }: PetCreatorPanelProps) {
     setLogs([]);
     setShowLogs(false);
     void loadResumeTasks();
-  }, [loadResumeTasks]);
+    void refreshRemoteStatus();
+  }, [loadResumeTasks, refreshRemoteStatus]);
+
+  const persistMode = useCallback(
+    async (mode: CreationMode, baseUrl: string) => {
+      setCreationMode(mode);
+      setRemoteBaseUrl(baseUrl);
+      try {
+        await invoke("save_remote_server_config", {
+          config: { mode, baseUrl: baseUrl.trim().replace(/\/+$/, "") },
+        });
+      } catch {
+        // ignore
+      }
+      if (mode === "remote") {
+        void refreshRemoteStatus();
+      } else {
+        setRemoteStatus(null);
+      }
+    },
+    [refreshRemoteStatus],
+  );
 
   const handleSubmit = useCallback(async () => {
     if (!canSubmit) return;
     setSubmitting(true);
     setErrorMessage("");
+    setRemoteTaskId(null);
 
     try {
       const request: PetCreationRequest = {
@@ -221,14 +304,25 @@ export function PetCreatorPanel({ onClose, onCreated }: PetCreatorPanelProps) {
         stylePreset,
       };
 
-      const id = await invoke<string>("start_pet_creation", { request });
+      const command =
+        creationMode === "remote" ? "start_remote_pet_creation" : "start_pet_creation";
+      const id = await invoke<string>(command, { request });
       setTaskId(id);
       setPhase("generating");
     } catch (e) {
       setErrorMessage(String(e));
       setSubmitting(false);
+      void refreshRemoteStatus();
     }
-  }, [canSubmit, petName, description, referenceImage, stylePreset]);
+  }, [
+    canSubmit,
+    petName,
+    description,
+    referenceImage,
+    stylePreset,
+    creationMode,
+    refreshRemoteStatus,
+  ]);
 
   const handleResume = useCallback(
     async (workDirName: string) => {
@@ -257,16 +351,41 @@ export function PetCreatorPanel({ onClose, onCreated }: PetCreatorPanelProps) {
       return;
     }
     try {
-      await invoke("cancel_pet_creation", { taskId });
+      if (creationMode === "remote") {
+        await invoke("cancel_remote_pet_creation", { taskId });
+      } else {
+        await invoke("cancel_pet_creation", { taskId });
+      }
     } catch {
       // ignore
     }
     handleReset();
-  }, [taskId, onClose, handleReset]);
+  }, [taskId, onClose, handleReset, creationMode]);
 
   const handleConfirmBase = useCallback(
     async (confirmed: boolean) => {
       if (!taskId) return;
+      if (creationMode === "remote") {
+        if (!remoteTaskId) {
+          setErrorMessage("缺少远程任务 ID，无法确认基础形象");
+          return;
+        }
+        if (!confirmed) {
+          await invoke("confirm_remote_base_image", {
+            remoteTaskId,
+            confirmed: false,
+          });
+          handleReset();
+          return;
+        }
+        await invoke("confirm_remote_base_image", {
+          remoteTaskId,
+          confirmed: true,
+        });
+        setPhase("generating");
+        return;
+      }
+
       if (!confirmed) {
         await invoke("confirm_base_image", { taskId, confirmed: false });
         handleReset();
@@ -275,7 +394,7 @@ export function PetCreatorPanel({ onClose, onCreated }: PetCreatorPanelProps) {
       await invoke("confirm_base_image", { taskId, confirmed: true });
       setPhase("generating");
     },
-    [taskId, handleReset],
+    [taskId, handleReset, creationMode, remoteTaskId],
   );
 
   const [dragOver, setDragOver] = useState(false);
@@ -369,6 +488,70 @@ export function PetCreatorPanel({ onClose, onCreated }: PetCreatorPanelProps) {
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
         <div className="w-[480px] rounded-2xl bg-white p-6 shadow-2xl">
           <h2 className="mb-4 text-center text-lg font-bold">捏一个新宠物</h2>
+
+          <div className="mb-4">
+            <label className="mb-2 block text-sm font-medium text-gray-700">生成方式</label>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                className={`flex-1 rounded-lg border px-3 py-2 text-xs ${
+                  creationMode === "local"
+                    ? "border-pink-500 bg-pink-50 text-pink-700"
+                    : "border-gray-200 text-gray-600"
+                }`}
+                onClick={() => void persistMode("local", remoteBaseUrl)}
+              >
+                本地自定义 AI
+              </button>
+              <button
+                type="button"
+                className={`flex-1 rounded-lg border px-3 py-2 text-xs ${
+                  creationMode === "remote"
+                    ? "border-pink-500 bg-pink-50 text-pink-700"
+                    : "border-gray-200 text-gray-600"
+                }`}
+                onClick={() => void persistMode("remote", remoteBaseUrl)}
+              >
+                我的生成服务
+              </button>
+            </div>
+          </div>
+
+          {creationMode === "remote" && (
+            <div className="mb-4 rounded-lg border border-gray-200 bg-gray-50 p-3">
+              <label className="mb-1 block text-xs font-medium text-gray-600">服务地址</label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-xs"
+                  value={remoteBaseUrl}
+                  onChange={(e) => setRemoteBaseUrl(e.target.value)}
+                  onBlur={() => void persistMode("remote", remoteBaseUrl)}
+                  placeholder="http://192.168.x.x:8787"
+                />
+                <button
+                  type="button"
+                  className="shrink-0 rounded-lg border border-gray-300 px-2 py-1 text-xs text-gray-600 hover:bg-white"
+                  onClick={() => void refreshRemoteStatus()}
+                >
+                  刷新
+                </button>
+              </div>
+              <p className="mt-2 text-xs text-gray-500">
+                状态：
+                {!remoteStatus || !remoteStatus.online
+                  ? "离线"
+                  : remoteStatus.state === "idle"
+                    ? "空闲，可以捏宠物"
+                    : remoteStatus.state === "awaiting_confirmation"
+                      ? `等待确认中${remoteStatus.petName ? `（${remoteStatus.petName}）` : ""}`
+                      : `生成中${remoteStatus.petName ? `（${remoteStatus.petName}）` : ""}`}
+              </p>
+              {remoteStatus?.error && (
+                <p className="mt-1 text-[11px] text-red-500">{remoteStatus.error}</p>
+              )}
+            </div>
+          )}
 
           <div className="mb-4">
             <label className="mb-1 block text-sm font-medium text-gray-700">
@@ -470,7 +653,7 @@ export function PetCreatorPanel({ onClose, onCreated }: PetCreatorPanelProps) {
             </div>
           </div>
 
-          {incompleteTasks.length > 0 && (
+          {creationMode === "local" && incompleteTasks.length > 0 && (
             <ResumeTasksCollapsible
               tasks={incompleteTasks}
               submitting={submitting}

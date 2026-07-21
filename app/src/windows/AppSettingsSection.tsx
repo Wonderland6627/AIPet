@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { getVersion } from "@tauri-apps/api/app";
 import { listen } from "@tauri-apps/api/event";
-import type { AiApiConfig, AppConfig } from "../types/aipet";
+import type { AiApiConfig, AppConfig, RemoteServerConfig, CreationMode } from "../types/aipet";
 import type { useAppUpdater } from "../hooks/useAppUpdater";
 
 function ToggleSwitch({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
@@ -131,6 +131,9 @@ export function AppSettingsSection({ updater }: AppSettingsSectionProps) {
           配置 AI API
         </button>
       </section>
+
+      {/* 远程生成服务 */}
+      <RemoteServerSettingsSection />
 
       {/* 系统 */}
       <section className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
@@ -391,5 +394,94 @@ function AiConfigModal({ onClose }: { onClose: () => void }) {
         </div>
       </div>
     </div>
+  );
+}
+
+function RemoteServerSettingsSection() {
+  const [mode, setMode] = useState<CreationMode>("local");
+  const [baseUrl, setBaseUrl] = useState("http://127.0.0.1:8787");
+  const [message, setMessage] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    void invoke<RemoteServerConfig>("get_remote_server_config").then((cfg) => {
+      setMode(cfg.mode);
+      setBaseUrl(cfg.baseUrl || "http://127.0.0.1:8787");
+    });
+  }, []);
+
+  const save = async () => {
+    setSaving(true);
+    setMessage("");
+    try {
+      await invoke("save_remote_server_config", {
+        config: {
+          mode,
+          baseUrl: baseUrl.trim().replace(/\/+$/, ""),
+        },
+      });
+      setMessage("保存成功");
+      setTimeout(() => setMessage(""), 2000);
+    } catch (e) {
+      setMessage(`保存失败: ${e}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <section className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
+      <h3 className="mb-3 text-sm font-semibold text-gray-800">远程生成服务</h3>
+      <p className="mb-3 text-xs text-gray-400">
+        可选择走本机 AI API，或连接你 Windows 内网中的 aipet-server（全局一次一个任务）
+      </p>
+      <div className="mb-3 flex gap-2">
+        <button
+          type="button"
+          className={`rounded-lg border px-3 py-1.5 text-xs ${
+            mode === "local"
+              ? "border-pink-500 bg-pink-50 text-pink-700"
+              : "border-gray-200 text-gray-600"
+          }`}
+          onClick={() => setMode("local")}
+        >
+          本地自定义 AI
+        </button>
+        <button
+          type="button"
+          className={`rounded-lg border px-3 py-1.5 text-xs ${
+            mode === "remote"
+              ? "border-pink-500 bg-pink-50 text-pink-700"
+              : "border-gray-200 text-gray-600"
+          }`}
+          onClick={() => setMode("remote")}
+        >
+          我的生成服务
+        </button>
+      </div>
+      <label className="mb-1 block text-xs text-gray-600">服务地址</label>
+      <input
+        type="text"
+        className="mb-3 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+        value={baseUrl}
+        onChange={(e) => setBaseUrl(e.target.value)}
+        placeholder="http://192.168.x.x:8787"
+      />
+      {message && (
+        <p
+          className={`mb-2 text-xs ${message.includes("失败") ? "text-red-500" : "text-green-500"}`}
+        >
+          {message}
+        </p>
+      )}
+      <button
+        type="button"
+        disabled={saving}
+        className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-600 transition hover:border-pink-300 hover:text-pink-600 disabled:opacity-50"
+        onClick={() => void save()}
+      >
+        {saving ? "保存中..." : "保存远程服务配置"}
+      </button>
+    </section>
   );
 }

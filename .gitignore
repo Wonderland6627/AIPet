@@ -4,6 +4,9 @@ app/node_modules/
 # Build output
 app/dist/
 app/src-tauri/target/
+target/
+server/data/
+server/ai-config.json
 
 # Tauri auto-generated
 app/src-tauri/gen/

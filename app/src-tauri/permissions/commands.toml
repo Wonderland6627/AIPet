@@ -24,5 +24,12 @@ commands.allow = [
   "resume_pet_creation",
   "cancel_pet_creation",
   "confirm_base_image",
+  "get_remote_server_config",
+  "save_remote_server_config",
+  "get_remote_server_status",
+  "start_remote_pet_creation",
+  "cancel_remote_pet_creation",
+  "confirm_remote_base_image",
+  "import_pet_zip_file",
   "delete_pet",
 ]

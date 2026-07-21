@@ -112,6 +112,7 @@ export interface PetCreationResult {
 export interface PetCreationBaseReady {
   taskId: string;
   baseImageB64: string;
+  remoteTaskId?: string;
 }
 
 export interface IncompleteCreationTask {
@@ -120,4 +121,20 @@ export interface IncompleteCreationTask {
   baseImageDone: boolean;
   completedCount: number;
   totalRows: number;
+}
+
+export type CreationMode = "local" | "remote";
+
+export interface RemoteServerConfig {
+  mode: CreationMode;
+  baseUrl: string;
+}
+
+export interface RemoteServerStatus {
+  online: boolean;
+  state: string;
+  activeTaskId?: string | null;
+  petName?: string | null;
+  phase?: string | null;
+  error?: string | null;
 }

@@ -1,0 +1,7 @@
+{
+  "provider": "openai",
+  "apiKey": "sk-your-key-here",
+  "baseUrl": "https://baseai.rivergame.net/v1",
+  "model": "gpt-image-1",
+  "providerCache": {}
+}
