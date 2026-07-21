@@ -56,7 +56,7 @@ cd app
 pnpm tauri build
 ```
 
-构建产物位于 `app/src-tauri/target/release/`，默认会尝试生成 `.msi` 和 NSIS 安装包。  
+构建产物位于仓库根目录 `target/release/`（Cargo workspace 统一输出目录），默认会尝试生成 `.msi` 和 NSIS 安装包。  
 CI 发布流程当前固定为 NSIS（`--bundles nsis`）以避免 GitHub Runner 上 WiX 打包不稳定问题。
 
 ## 安装方式
